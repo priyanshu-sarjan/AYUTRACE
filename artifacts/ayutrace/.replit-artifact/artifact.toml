@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "AyuTraceChain"
+version = "1.0.0"
+id = "artifacts/ayutrace"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 21519
+
+[services.development]
+run = "pnpm --filter @workspace/ayutrace run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/ayutrace", "run", "build" ]
+publicDir = "artifacts/ayutrace/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "21519"
+BASE_PATH = "/"

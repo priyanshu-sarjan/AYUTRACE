@@ -3,20 +3,35 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: AyuTraceChain API specification
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Authentication
+  - name: herbs
+    description: Herb catalog and discovery
+  - name: products
+    description: Product management
+  - name: supply-chain
+    description: Supply chain traceability
+  - name: orders
+    description: Order management
+  - name: community
+    description: Community feed and posts
+  - name: dashboard
+    description: Role-based dashboard data
+  - name: feedback
+    description: Customer feedback
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +39,392 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginBody"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+
+  /auth/register:
+    post:
+      operationId: register
+      tags: [auth]
+      summary: Register new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterBody"
+      responses:
+        "201":
+          description: Registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current user
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /herbs:
+    get:
+      operationId: listHerbs
+      tags: [herbs]
+      summary: List all herbs
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: region
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: List of herbs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HerbList"
+
+  /herbs/trending:
+    get:
+      operationId: getTrendingHerbs
+      tags: [herbs]
+      summary: Get trending herbs
+      responses:
+        "200":
+          description: Trending herbs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HerbList"
+
+  /herbs/map-pins:
+    get:
+      operationId: getHerbMapPins
+      tags: [herbs]
+      summary: Get herb geographic pins for map
+      responses:
+        "200":
+          description: Herb map pins
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HerbMapPinList"
+
+  /herbs/{id}:
+    get:
+      operationId: getHerb
+      tags: [herbs]
+      summary: Get herb details
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Herb details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HerbDetail"
+
+  /products:
+    get:
+      operationId: listProducts
+      tags: [products]
+      summary: List products
+      parameters:
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: sellerId
+          in: query
+          schema:
+            type: integer
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: List of products
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductList"
+    post:
+      operationId: createProduct
+      tags: [products]
+      summary: Create product (seller/farmer only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProductBody"
+      responses:
+        "201":
+          description: Product created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+
+  /products/announcements:
+    get:
+      operationId: getProductAnnouncements
+      tags: [products]
+      summary: Get latest product announcements
+      responses:
+        "200":
+          description: Product announcements
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductList"
+
+  /products/{id}:
+    get:
+      operationId: getProduct
+      tags: [products]
+      summary: Get product details
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Product details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+
+  /supply-chain/{batchId}:
+    get:
+      operationId: getSupplyChainJourney
+      tags: [supply-chain]
+      summary: Get supply chain journey for a batch
+      parameters:
+        - name: batchId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Supply chain journey
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SupplyChainJourney"
+
+  /orders:
+    get:
+      operationId: listOrders
+      tags: [orders]
+      summary: List orders for current user
+      responses:
+        "200":
+          description: Orders
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderList"
+    post:
+      operationId: createOrder
+      tags: [orders]
+      summary: Create an order
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOrderBody"
+      responses:
+        "201":
+          description: Order created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+
+  /orders/{id}/track:
+    get:
+      operationId: trackOrder
+      tags: [orders]
+      summary: Track order supply chain
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Order tracking info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SupplyChainJourney"
+
+  /community/posts:
+    get:
+      operationId: listCommunityPosts
+      tags: [community]
+      summary: List community posts
+      parameters:
+        - name: category
+          in: query
+          schema:
+            type: string
+            enum: [announcement, wellness, trending]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: Community posts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommunityPostList"
+    post:
+      operationId: createCommunityPost
+      tags: [community]
+      summary: Create a community post
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCommunityPostBody"
+      responses:
+        "201":
+          description: Post created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommunityPost"
+
+  /feedback:
+    post:
+      operationId: submitFeedback
+      tags: [feedback]
+      summary: Submit customer feedback
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FeedbackBody"
+      responses:
+        "201":
+          description: Feedback submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Feedback"
+
+  /dashboard/farmer:
+    get:
+      operationId: getFarmerDashboard
+      tags: [dashboard]
+      summary: Get farmer dashboard summary
+      responses:
+        "200":
+          description: Farmer dashboard
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FarmerDashboard"
+
+  /dashboard/consumer:
+    get:
+      operationId: getConsumerDashboard
+      tags: [dashboard]
+      summary: Get consumer dashboard summary
+      responses:
+        "200":
+          description: Consumer dashboard
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsumerDashboard"
+
+  /dashboard/seller:
+    get:
+      operationId: getSellerDashboard
+      tags: [dashboard]
+      summary: Get seller dashboard summary
+      responses:
+        "200":
+          description: Seller dashboard
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SellerDashboard"
+
 components:
   schemas:
     HealthStatus:
@@ -31,6 +432,439 @@ components:
       properties:
         status:
           type: string
-      required:
-        - status
+      required: [status]
 
+    LoginBody:
+      type: object
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+        role:
+          type: string
+          enum: [farmer, consumer, seller]
+      required: [email, password, role]
+
+    RegisterBody:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        password:
+          type: string
+        role:
+          type: string
+          enum: [farmer, consumer, seller]
+        region:
+          type: string
+      required: [name, email, password, role]
+
+    AuthResponse:
+      type: object
+      properties:
+        token:
+          type: string
+        user:
+          $ref: "#/components/schemas/User"
+      required: [token, user]
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+          enum: [farmer, consumer, seller]
+        region:
+          type: string
+        avatarUrl:
+          type: string
+        createdAt:
+          type: string
+      required: [id, name, email, role]
+
+    Herb:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        botanicalName:
+          type: string
+        region:
+          type: string
+        latitude:
+          type: number
+        longitude:
+          type: number
+        imageUrl:
+          type: string
+        benefits:
+          type: array
+          items:
+            type: string
+        uses:
+          type: string
+        harvestSeason:
+          type: string
+        currentStock:
+          type: integer
+        pricePerKg:
+          type: number
+        trendScore:
+          type: integer
+      required: [id, name, botanicalName, region, latitude, longitude]
+
+    HerbDetail:
+      allOf:
+        - $ref: "#/components/schemas/Herb"
+        - type: object
+          properties:
+            sellers:
+              type: array
+              items:
+                $ref: "#/components/schemas/User"
+            recentBatches:
+              type: array
+              items:
+                type: string
+
+    HerbList:
+      type: object
+      properties:
+        herbs:
+          type: array
+          items:
+            $ref: "#/components/schemas/Herb"
+        total:
+          type: integer
+      required: [herbs, total]
+
+    HerbMapPin:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        latitude:
+          type: number
+        longitude:
+          type: number
+        region:
+          type: string
+        herbCount:
+          type: integer
+      required: [id, name, latitude, longitude, region]
+
+    HerbMapPinList:
+      type: object
+      properties:
+        pins:
+          type: array
+          items:
+            $ref: "#/components/schemas/HerbMapPin"
+      required: [pins]
+
+    Product:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+        imageUrl:
+          type: string
+        price:
+          type: number
+        stockQty:
+          type: integer
+        sellerId:
+          type: integer
+        sellerName:
+          type: string
+        herbId:
+          type: integer
+        herbName:
+          type: string
+        batchId:
+          type: string
+        isNew:
+          type: boolean
+        rating:
+          type: number
+        reviewCount:
+          type: integer
+        createdAt:
+          type: string
+      required: [id, name, price, sellerId, sellerName]
+
+    ProductList:
+      type: object
+      properties:
+        products:
+          type: array
+          items:
+            $ref: "#/components/schemas/Product"
+        total:
+          type: integer
+      required: [products, total]
+
+    CreateProductBody:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+        imageUrl:
+          type: string
+        price:
+          type: number
+        stockQty:
+          type: integer
+        herbId:
+          type: integer
+      required: [name, price, stockQty]
+
+    SupplyChainStep:
+      type: object
+      properties:
+        stage:
+          type: string
+          enum: [farm, warehouse, factory, store, consumer]
+        location:
+          type: string
+        latitude:
+          type: number
+        longitude:
+          type: number
+        timestamp:
+          type: string
+        notes:
+          type: string
+        verified:
+          type: boolean
+      required: [stage, location, timestamp, verified]
+
+    SupplyChainJourney:
+      type: object
+      properties:
+        batchId:
+          type: string
+        herbName:
+          type: string
+        steps:
+          type: array
+          items:
+            $ref: "#/components/schemas/SupplyChainStep"
+        currentStage:
+          type: string
+      required: [batchId, steps, currentStage]
+
+    Order:
+      type: object
+      properties:
+        id:
+          type: integer
+        productId:
+          type: integer
+        productName:
+          type: string
+        productImageUrl:
+          type: string
+        quantity:
+          type: integer
+        totalPrice:
+          type: number
+        status:
+          type: string
+          enum: [pending, processing, shipped, delivered]
+        batchId:
+          type: string
+        createdAt:
+          type: string
+      required: [id, productId, productName, quantity, totalPrice, status, createdAt]
+
+    OrderList:
+      type: object
+      properties:
+        orders:
+          type: array
+          items:
+            $ref: "#/components/schemas/Order"
+        total:
+          type: integer
+      required: [orders, total]
+
+    CreateOrderBody:
+      type: object
+      properties:
+        productId:
+          type: integer
+        quantity:
+          type: integer
+      required: [productId, quantity]
+
+    CommunityPost:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        content:
+          type: string
+        category:
+          type: string
+          enum: [announcement, wellness, trending]
+        imageUrl:
+          type: string
+        authorId:
+          type: integer
+        authorName:
+          type: string
+        authorAvatarUrl:
+          type: string
+        likes:
+          type: integer
+        createdAt:
+          type: string
+      required: [id, title, content, category, authorId, authorName, createdAt]
+
+    CommunityPostList:
+      type: object
+      properties:
+        posts:
+          type: array
+          items:
+            $ref: "#/components/schemas/CommunityPost"
+        total:
+          type: integer
+      required: [posts, total]
+
+    CreateCommunityPostBody:
+      type: object
+      properties:
+        title:
+          type: string
+        content:
+          type: string
+        category:
+          type: string
+          enum: [announcement, wellness, trending]
+        imageUrl:
+          type: string
+      required: [title, content, category]
+
+    FeedbackBody:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        subject:
+          type: string
+        message:
+          type: string
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+      required: [name, email, subject, message]
+
+    Feedback:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+        subject:
+          type: string
+        message:
+          type: string
+        rating:
+          type: integer
+        createdAt:
+          type: string
+      required: [id, name, email, subject, message, createdAt]
+
+    FarmerDashboard:
+      type: object
+      properties:
+        totalHerbs:
+          type: integer
+        totalRevenue:
+          type: number
+        activeOrders:
+          type: integer
+        pendingShipments:
+          type: integer
+        topHerbs:
+          type: array
+          items:
+            $ref: "#/components/schemas/Herb"
+        recentOrders:
+          type: array
+          items:
+            $ref: "#/components/schemas/Order"
+      required: [totalHerbs, totalRevenue, activeOrders, pendingShipments]
+
+    ConsumerDashboard:
+      type: object
+      properties:
+        totalOrders:
+          type: integer
+        activeOrders:
+          type: integer
+        totalSpent:
+          type: number
+        recentOrders:
+          type: array
+          items:
+            $ref: "#/components/schemas/Order"
+        recommendedProducts:
+          type: array
+          items:
+            $ref: "#/components/schemas/Product"
+      required: [totalOrders, activeOrders, totalSpent]
+
+    SellerDashboard:
+      type: object
+      properties:
+        totalProducts:
+          type: integer
+        totalRevenue:
+          type: number
+        totalOrders:
+          type: integer
+        activeListings:
+          type: integer
+        topProducts:
+          type: array
+          items:
+            $ref: "#/components/schemas/Product"
+        recentOrders:
+          type: array
+          items:
+            $ref: "#/components/schemas/Order"
+      required: [totalProducts, totalRevenue, totalOrders, activeListings]

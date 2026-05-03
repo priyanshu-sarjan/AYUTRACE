@@ -44,6 +44,11 @@ export function setAuthTokenGetter(getter: AuthTokenGetter | null): void {
   _authTokenGetter = getter;
 }
 
+// Automatically set the token getter to read from localStorage
+if (typeof window !== "undefined") {
+  setAuthTokenGetter(() => localStorage.getItem("ayutrace_token"));
+}
+
 function isRequest(input: RequestInfo | URL): input is Request {
   return typeof Request !== "undefined" && input instanceof Request;
 }

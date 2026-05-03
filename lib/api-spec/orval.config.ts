@@ -3,6 +3,7 @@ import path from "path";
 
 const root = path.resolve(__dirname, "..", "..");
 const apiClientReactSrc = path.resolve(root, "lib", "api-client-react", "src");
+const apiZodRoot = path.resolve(root, "lib", "api-zod");
 const apiZodSrc = path.resolve(root, "lib", "api-zod", "src");
 
 // Our exports make assumptions about the title of the API being "Api" (i.e. generated output is `api.ts`).
@@ -48,11 +49,10 @@ export default defineConfig({
       },
     },
     output: {
-      workspace: apiZodSrc,
+      workspace: apiZodRoot,
       client: "zod",
-      target: "generated",
-      schemas: { path: "generated/types", type: "typescript" },
-      mode: "split",
+      target: "src/generated/api",
+      mode: "single",
       clean: true,
       prettier: true,
       override: {

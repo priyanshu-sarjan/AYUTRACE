@@ -1,0 +1,29 @@
+You are an expert Full-Stack MERN (MongoDB, Express, React, Node.js) developer. Your task is to build the foundation for an advanced Ayurvedic supply chain and e-commerce platform called "AyuTraceChain". The website must be responsive, modern (resembling the UX of Netflix or Amazon), and built with Tailwind CSS.
+
+Please generate the frontend UI shell, routing, and backend schema structures for the following core features:
+
+1. Interactive Geotagging & Supply Chain Map: 
+- Integrate a mapping library (like React-Leaflet or Mapbox).
+- Display a map of India with pinned markers showing the geographic distribution of specific Ayurvedic herbs.
+- Create an animated visualizer on the map that traces a package's journey through the supply chain: Farm Area -> Warehouse -> Factory -> Store -> Consumer.
+
+2. Role-Based Access Control (RBAC) & Dashboards:
+Implement a mock JWT-based authentication UI with three distinct user roles:
+- Farmer: Dashboard to list herbs, manage farm inventory, and sell directly to consumers.
+- Consumer: Dashboard to purchase from farmers/companies, view order history, and track supply chain logistics.
+- Seller/Company: Dashboard to list manufactured Ayurvedic products and manage store inventory.
+
+3. Global Database Search & Discovery:
+- Build a persistent search bar in the navbar.
+- When a user searches for an herb (e.g., "Ashwagandha") or product, it should display a detailed component showing its botanical info, health benefits, and current sellers.
+
+4. Netflix-Style Community Feed & Announcements:
+- Build an infinite-scrolling or horizontally swiping section (like Netflix categories) for: "Latest Product Announcements," "Health & Wellness Community Posts," and "Trending Herbs."
+- Include a dedicated, accessible form for Customer Feedback and Complaints.
+
+5. "Perfect Website" Pro Features (Traceability & UI):
+- QR Code Traceability: Add a UI element on product pages where users can simulate scanning a QR code to view the complete immutable journey of that specific herb batch from soil to shelf.
+- Implement a Dark/Light mode toggle.
+- Create a highly polished, interactive hero section.
+
+Please start by setting up the React application structure, the Tailwind configurations, the main navigation router, and the placeholder interactive Map component. Write clean, modular, and well-commented code.
