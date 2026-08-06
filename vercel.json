@@ -1,0 +1,12 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "pnpm install --frozen-lockfile --prod=false",
+  "buildCommand": "pnpm --filter @workspace/ayutrace run build",
+  "outputDirectory": "artifacts/ayutrace/dist/public",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
