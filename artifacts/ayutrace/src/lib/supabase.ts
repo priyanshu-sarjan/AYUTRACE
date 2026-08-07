@@ -1,11 +1,19 @@
 import { createClient } from "@supabase/supabase-js";
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "";
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
+// Provide a valid dummy fallback URL to prevent createClient from crashing if env vars are missing in Vercel
+const supabaseUrl =
+  import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_URL.trim() !== ""
+    ? import.meta.env.VITE_SUPABASE_URL
+    : "https://placeholder.supabase.co";
 
-if (!supabaseUrl || !supabaseAnonKey) {
+const supabaseAnonKey =
+  import.meta.env.VITE_SUPABASE_ANON_KEY && import.meta.env.VITE_SUPABASE_ANON_KEY.trim() !== ""
+    ? import.meta.env.VITE_SUPABASE_ANON_KEY
+    : "eyJhY2Nlc3NfdG9rZW4iOiJwbGFjZWhvbGRlciJ9";
+
+if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
   console.warn(
-    "⚠️ Supabase environment variables missing! Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env.local or Vercel."
+    "⚠️ Supabase environment variables missing! Using offline mock mode. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in Vercel to connect your live database."
   );
 }
 
@@ -24,7 +32,7 @@ export interface HerbRecord {
   harvest_date?: string;
   quality_grade?: string;
   lab_tested?: boolean;
-  perishability_priority?: number; // 1: High/Express, 2: Med, 3: Low/Standard
+  perishability_priority?: number;
   days_to_spoil?: number;
   gps_coordinates?: string;
   qr_code_url?: string;

@@ -1,3 +1,4 @@
+import { Component, ReactNode } from "react";
 import { Switch, Route, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -27,6 +28,54 @@ const queryClient = new QueryClient({
   },
 });
 
+interface ErrorBoundaryProps {
+  children: ReactNode;
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error?: Error;
+}
+
+class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: unknown) {
+    console.error("Uncaught error in React render tree:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-background text-foreground text-center space-y-4">
+          <div className="w-12 h-12 rounded-full bg-red-500/20 text-red-400 flex items-center justify-center text-xl font-bold">
+            ⚠️
+          </div>
+          <h2 className="text-2xl font-bold font-serif">Something went wrong</h2>
+          <p className="text-xs text-muted-foreground max-w-md">
+            {this.state.error?.message || "An unexpected error occurred."}
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 text-xs font-semibold bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
+          >
+            Reload App
+          </button>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 function Router() {
   return (
     <div className="flex flex-col min-h-[100dvh]">
@@ -53,17 +102,21 @@ function Router() {
 }
 
 function App() {
+  const baseUrl = import.meta.env.BASE_URL ? import.meta.env.BASE_URL.replace(/\/$/, "") : "";
+
   return (
-    <ThemeProvider defaultTheme="dark" storageKey="ayutrace-theme">
-      <QueryClientProvider client={queryClient}>
-        <TooltipProvider>
-          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-            <Router />
-          </WouterRouter>
-          <Toaster />
-        </TooltipProvider>
-      </QueryClientProvider>
-    </ThemeProvider>
+    <ErrorBoundary>
+      <ThemeProvider defaultTheme="dark" storageKey="ayutrace-theme">
+        <QueryClientProvider client={queryClient}>
+          <TooltipProvider>
+            <WouterRouter base={baseUrl}>
+              <Router />
+            </WouterRouter>
+            <Toaster />
+          </TooltipProvider>
+        </QueryClientProvider>
+      </ThemeProvider>
+    </ErrorBoundary>
   );
 }
 
