@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { MapContainer, TileLayer, Marker, Popup, Polyline } from "react-leaflet";
 import L from "leaflet";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,7 +14,6 @@ import {
   Truck,
   Sprout,
   CheckCircle2,
-  AlertCircle,
 } from "lucide-react";
 import { MOCK_WAREHOUSES, MOCK_CROP_REGIONS } from "@/lib/supabase-api";
 
@@ -49,7 +48,7 @@ const PRIORITY_1_MANGO_ROUTE: [number, number][] = [
 
 // Priority 1 Express Route: Nashik Tomatoes 🍅 -> Navi Mumbai APMC
 const PRIORITY_1_TOMATO_ROUTE: [number, number][] = [
-  [20.0059, 73.7898], // Nashik Farm
+  [19.9975, 73.7898], // Nashik Farm
   [19.0760, 72.9981], // Navi Mumbai Hub
 ];
 
@@ -78,27 +77,33 @@ export default function MapPage() {
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
 
-          {/* Render City Warehouses Pins */}
+          {/* Render City Warehouses Pins Safely */}
           {MOCK_WAREHOUSES.map((wh) => {
-            const coords = wh.location_coords.split(",").map((c) => parseFloat(c.trim())) as [number, number];
+            let coords: [number, number] = [20.5937, 78.9629];
+            if (wh.lat != null && wh.lon != null) {
+              coords = [wh.lat, wh.lon];
+            } else if (wh.location_coords && typeof wh.location_coords === "string") {
+              coords = wh.location_coords.split(",").map((c) => parseFloat(c.trim())) as [number, number];
+            }
+
             return (
               <Marker
                 key={wh.id}
                 position={coords}
-                icon={wh.pest_alert_status === "Optimal" ? warehouseIconOk : warehouseIconWarning}
+                icon={wh.pest_detected || wh.pest_alert_status === "Warning" ? warehouseIconWarning : warehouseIconOk}
               >
                 <Popup>
                   <div className="p-1 space-y-1.5 text-xs text-foreground">
                     <h4 className="font-bold text-sm text-emerald-600 flex items-center gap-1">
                       <Warehouse className="w-3.5 h-3.5" /> {wh.name}
                     </h4>
-                    <p className="text-muted-foreground">City: {wh.city}</p>
+                    <p className="text-muted-foreground">City: {wh.city}, {wh.state}</p>
                     <div className="grid grid-cols-2 gap-1.5 bg-muted/60 p-2 rounded-lg">
-                      <div>🌡️ Temp: <strong>{wh.temperature_celsius}°C</strong></div>
-                      <div>💧 Humidity: <strong>{wh.humidity_percent}%</strong></div>
+                      <div>🌡️ Temp: <strong>{wh.current_temp_c ?? wh.temperature_celsius}°C</strong></div>
+                      <div>💧 Humidity: <strong>{wh.humidity_pct ?? wh.humidity_percent}%</strong></div>
                     </div>
                     <p className="text-[11px] font-semibold text-amber-600">
-                      Pest Alert: {wh.pest_alert_status} | Quality Rank: #{wh.quality_rank}
+                      Pest Alert: {wh.pest_detected ? "Detected ⚠️" : "Optimal"} | Rank Score: #{wh.calculated_rank_score ?? wh.rank_score}
                     </p>
                   </div>
                 </Popup>
@@ -106,9 +111,13 @@ export default function MapPage() {
             );
           })}
 
-          {/* Render Regional Crop Belts Pins */}
+          {/* Render Regional Crop Belts Pins Safely */}
           {MOCK_CROP_REGIONS.map((reg) => {
-            const coords = reg.geo_coords.split(",").map((c) => parseFloat(c.trim())) as [number, number];
+            let coords: [number, number] = [20.5937, 78.9629];
+            if (reg.geo_coords && typeof reg.geo_coords === "string") {
+              coords = reg.geo_coords.split(",").map((c) => parseFloat(c.trim())) as [number, number];
+            }
+
             return (
               <Marker key={reg.id} position={coords} icon={farmIcon}>
                 <Popup>
@@ -217,7 +226,7 @@ export default function MapPage() {
             {MOCK_CROP_REGIONS.map((reg) => (
               <Card
                 key={reg.id}
-                onClick={() => setSelectedRegion(reg.id)}
+                onClick={() => setSelectedRegion(reg.id || "")}
                 className={`border cursor-pointer transition-all ${
                   selectedRegion === reg.id
                     ? "border-primary bg-primary/10"
@@ -278,35 +287,51 @@ export default function MapPage() {
                     </h4>
                     <Badge
                       className={
-                        wh.quality_rank === 1
+                        (wh.calculated_rank_score ?? wh.rank_score) >= 80
                           ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/40"
                           : "bg-amber-500/20 text-amber-400 border-amber-500/40"
                       }
                     >
-                      Rank #{wh.quality_rank}
+                      Rank #{wh.calculated_rank_score ?? wh.rank_score}
                     </Badge>
                   </div>
 
                   <div className="grid grid-cols-2 gap-2 text-xs pt-1">
                     <div className="flex items-center gap-1.5 text-muted-foreground">
                       <Thermometer className="w-3.5 h-3.5 text-blue-400" />
-                      <span>{wh.temperature_celsius}°C (Cold)</span>
+                      <span>{wh.current_temp_c ?? wh.temperature_celsius}°C (Cold)</span>
                     </div>
                     <div className="flex items-center gap-1.5 text-muted-foreground">
                       <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                      <span>Pest: {wh.pest_alert_status}</span>
+                      <span>Pest: {wh.pest_detected ? "Detected ⚠️" : "Optimal"}</span>
                     </div>
                   </div>
 
                   <div className="space-y-1 pt-1">
                     <div className="flex justify-between text-[11px] text-muted-foreground">
-                      <span>Capacity Utilized</span>
-                      <span className="font-bold">{wh.capacity_used_pct}%</span>
+                      <span>Occupied Capacity</span>
+                      <span className="font-bold">
+                        {Math.round(
+                          ((wh.occupied_capacity_tonnes ?? wh.capacity_used_pct) /
+                            (wh.storage_capacity_tonnes ?? 100)) *
+                            100
+                        )}
+                        %
+                      </span>
                     </div>
                     <div className="w-full bg-muted h-1.5 rounded-full overflow-hidden">
                       <div
                         className="bg-primary h-full rounded-full"
-                        style={{ width: `${wh.capacity_used_pct}%` }}
+                        style={{
+                          width: `${Math.min(
+                            100,
+                            Math.round(
+                              ((wh.occupied_capacity_tonnes ?? wh.capacity_used_pct) /
+                                (wh.storage_capacity_tonnes ?? 100)) *
+                                100
+                            )
+                          )}%`,
+                        }}
                       />
                     </div>
                   </div>
