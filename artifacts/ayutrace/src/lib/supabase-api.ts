@@ -1,479 +1,451 @@
-import {
-  supabase,
-  HerbRecord,
-  ProductRecord,
-  OrderRecord,
-  WarehouseRecord,
-  CropRegionRecord,
-  CommunityPollRecord,
-  DynamicProcurementRecord,
-} from "./supabase";
+import { supabase } from "./supabaseClient";
 
-// ==========================================
-// 🌿 HERBS & PERISHABLE CROPS API
-// ==========================================
+// Shelf life definitions (in days)
+const CROP_SHELF_LIFE: Record<string, number> = {
+  Tomato: 5,
+  Spinach: 3,
+  "Dasheri Mango": 4,
+  Banana: 6,
+  Apple: 14,
+  Onion: 90,
+  Potato: 120,
+  Ashwagandha: 180,
+};
 
-export async function fetchHerbs() {
-  const { data, error } = await supabase
-    .from("herbs")
-    .select("*")
-    .order("created_at", { ascending: false });
+export interface HarvestBatch {
+  batch_id: string;
+  crop_name: string;
+  farmer_id?: string;
+  farmer_name?: string;
+  harvest_date: string;
+  quantity_kg: number;
+  warehouse_id?: string;
+  warehouse_name?: string;
+  warehouse_city?: string;
+  warehouse_temp?: number;
+  warehouse_pest_alert?: boolean;
+  status: string;
+  remaining_days_life?: number;
+  freshness_pct?: number;
+  original_price?: number;
+  discount_pct?: number;
+  discounted_price?: number;
+}
 
-  if (error || !data || data.length === 0) {
-    return MOCK_HERBS;
+export interface Warehouse {
+  id: string;
+  name: string;
+  location_city: string;
+  current_temp_c: number;
+  humidity_pct: number;
+  pest_alert: boolean;
+  rank_score: number;
+  lat?: number;
+  lon?: number;
+  location_coords?: string;
+  temperature_celsius?: number;
+  humidity_percent?: number;
+  pest_alert_status?: string;
+  quality_rank?: number;
+  calculated_rank_score?: number;
+  capacity_used_pct?: number;
+  storage_capacity_tonnes?: number;
+  occupied_capacity_tonnes?: number;
+}
+
+export interface CropRegion {
+  id: string;
+  region_name: string;
+  state: string;
+  major_crop: string;
+  production_status: "Underproduction" | "Optimal" | "Overproduction Risk";
+  estimated_yield_tons: number;
+  active_farmers_count: number;
+  geo_coords: string;
+  recommended_alternative_crop?: string;
+}
+
+export interface ProductItem {
+  id: string;
+  title: string;
+  description: string;
+  price: number;
+  discount_price?: number;
+  is_clearance?: boolean;
+  category: string;
+  image_url: string;
+  batch_number: string;
+  seller_name: string;
+  freshness_score: number;
+  days_remaining: number;
+}
+
+export interface PollItem {
+  id: string;
+  title: string;
+  crop_name: string;
+  target_demand_tons: number;
+  farmer_votes: number;
+  consumer_votes: number;
+  advisory_recommendation: string;
+}
+
+// =================================================================
+// 1. PREDICTIVE SPOILAGE ENGINE & DYNAMIC MARKDOWN CALCULATOR
+// =================================================================
+
+export function calculateBatchSpoilage(
+  batch: HarvestBatch,
+  warehouse?: Warehouse
+): { remainingDays: number; freshnessScore: number; isHighRisk: boolean } {
+  const shelfLife = CROP_SHELF_LIFE[batch.crop_name] || 7;
+  const harvestTime = new Date(batch.harvest_date).getTime();
+  const now = new Date().getTime();
+  const daysElapsed = Math.max(0, Math.floor((now - harvestTime) / (1000 * 60 * 60 * 24)));
+
+  // Accelerated spoilage penalty if warehouse temp > 8°C
+  let tempPenaltyDays = 0;
+  if (warehouse && warehouse.current_temp_c > 8.0) {
+    tempPenaltyDays = 2; // Temperature breach accelerates spoilage by 2 days
   }
-  return data as HerbRecord[];
+
+  const remainingDays = Math.max(0, shelfLife - daysElapsed - tempPenaltyDays);
+  const freshnessScore = Math.max(0, Math.round((remainingDays / shelfLife) * 100));
+  const isHighRisk = remainingDays <= 2;
+
+  return { remainingDays, freshnessScore, isHighRisk };
 }
 
-export async function fetchHerbById(id: string) {
-  const { data, error } = await supabase
-    .from("herbs")
-    .select("*")
-    .eq("id", id)
-    .single();
+// =================================================================
+// 2. IOT WAREHOUSE RANKING CALCULATOR
+// =================================================================
 
-  if (error || !data) {
-    return MOCK_HERBS.find((h) => h.id === id) || MOCK_HERBS[0];
+export function calculateWarehouseRankScore(wh: Warehouse): number {
+  let score = 100;
+  
+  // Deduct 10 points for every degree above 4°C
+  if (wh.current_temp_c > 4.0) {
+    score -= Math.round((wh.current_temp_c - 4.0) * 10);
   }
-  return data as HerbRecord;
+
+  // Deduct 30 points if pest alert is true
+  if (wh.pest_alert) {
+    score -= 30;
+  }
+
+  return Math.max(0, Math.min(100, score));
 }
 
-export async function addHerbRecord(herb: HerbRecord) {
+// =================================================================
+// 3. SUPABASE DATA FETCHERS & TRACEABILITY JOIN
+// =================================================================
+
+export async function fetchWarehousesWithRankings(): Promise<Warehouse[]> {
   const { data, error } = await supabase
-    .from("herbs")
-    .insert([herb])
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data as HerbRecord;
-}
-
-// ==========================================
-// 🏬 DYNAMIC WAREHOUSES & RANKINGS VIEW API
-// ==========================================
-
-export async function fetchWarehouses() {
-  // Query dynamic calculated rankings view if available
-  const { data, error } = await supabase
-    .from("v_warehouse_rankings")
+    .from("warehouses")
     .select("*");
 
   if (error || !data || data.length === 0) {
-    // Fallback to direct warehouses table query
-    const { data: rawData, error: rawError } = await supabase
-      .from("warehouses")
-      .select("*")
-      .order("rank_score", { ascending: false });
-
-    if (rawError || !rawData || rawData.length === 0) {
-      return MOCK_WAREHOUSES;
-    }
-    return rawData as WarehouseRecord[];
+    return MOCK_WAREHOUSES;
   }
-  return data as WarehouseRecord[];
+
+  // Calculate live IoT rank score for each warehouse & sort top to bottom
+  const ranked = (data as Warehouse[]).map((wh) => ({
+    ...wh,
+    rank_score: calculateWarehouseRankScore(wh),
+  }));
+
+  return ranked.sort((a, b) => b.rank_score - a.rank_score);
 }
 
-// ==========================================
-// ⚡ DYNAMIC PROCUREMENT ENGINE API
-// ==========================================
-
-export async function fetchDynamicProcurement() {
+export async function fetchHarvestBatchesWithSpoilage(): Promise<HarvestBatch[]> {
   const { data, error } = await supabase
-    .from("dynamic_procurement")
-    .select("*")
-    .order("discount_pct", { ascending: false });
+    .from("harvest_batches")
+    .select("*, profiles:farmer_id(full_name), warehouses:warehouse_id(*)");
 
   if (error || !data || data.length === 0) {
-    return MOCK_DYNAMIC_PROCUREMENT;
+    return MOCK_HARVEST_BATCHES;
   }
-  return data as DynamicProcurementRecord[];
+
+  return data.map((b: any) => {
+    const wh = b.warehouses;
+    const batchObj: HarvestBatch = {
+      batch_id: b.batch_id,
+      crop_name: b.crop_name,
+      farmer_id: b.farmer_id,
+      farmer_name: b.profiles?.full_name || "Organic Farmer",
+      harvest_date: b.harvest_date,
+      quantity_kg: b.quantity_kg,
+      warehouse_id: b.warehouse_id,
+      warehouse_name: wh?.name,
+      warehouse_city: wh?.location_city,
+      warehouse_temp: wh?.current_temp_c,
+      warehouse_pest_alert: wh?.pest_alert,
+      status: b.status,
+    };
+
+    const { remainingDays, freshnessScore, isHighRisk } = calculateBatchSpoilage(batchObj, wh);
+    
+    // Dynamic 50% discount if within 2 days of spoilage
+    const basePrice = b.crop_name === "Tomato" ? 30 : b.crop_name === "Dasheri Mango" ? 85 : 25;
+    const discountPct = isHighRisk ? 50 : 0;
+    const discountedPrice = basePrice * (1 - discountPct / 100);
+
+    return {
+      ...batchObj,
+      remaining_days_life: remainingDays,
+      freshness_pct: freshnessScore,
+      original_price: basePrice,
+      discount_pct: discountPct,
+      discounted_price: discountedPrice,
+    };
+  });
 }
 
-// ==========================================
-// 🗺️ GIS CROP REGIONS API
-// ==========================================
-
-export async function fetchCropRegions() {
+/**
+ * Dynamic Route Traceability Join: Fetches complete lifecycle for /trace/[batch_id]
+ */
+export async function fetchBatchTraceability(batchId: string): Promise<HarvestBatch | null> {
   const { data, error } = await supabase
-    .from("crop_regions")
-    .select("*")
-    .order("region_name", { ascending: true });
-
-  if (error || !data || data.length === 0) {
-    return MOCK_CROP_REGIONS;
-  }
-  return data as CropRegionRecord[];
-}
-
-// ==========================================
-// 📦 PRODUCTS & MARKETPLACE API
-// ==========================================
-
-export async function fetchProducts() {
-  const { data, error } = await supabase
-    .from("products")
-    .select("*")
-    .order("created_at", { ascending: false });
-
-  if (error || !data || data.length === 0) {
-    return MOCK_PRODUCTS;
-  }
-  return data as ProductRecord[];
-}
-
-export async function fetchProductById(id: string) {
-  const { data, error } = await supabase
-    .from("products")
-    .select("*")
-    .eq("id", id)
+    .from("harvest_batches")
+    .select("*, profiles:farmer_id(full_name, region), warehouses:warehouse_id(*)")
+    .eq("batch_id", batchId)
     .single();
 
   if (error || !data) {
-    return MOCK_PRODUCTS.find((p) => p.id === id) || MOCK_PRODUCTS[0];
+    const mock = MOCK_HARVEST_BATCHES.find((b) => b.batch_id === batchId) || MOCK_HARVEST_BATCHES[0];
+    return mock;
   }
-  return data as ProductRecord;
+
+  const wh = data.warehouses;
+  const batchObj: HarvestBatch = {
+    batch_id: data.batch_id,
+    crop_name: data.crop_name,
+    farmer_id: data.farmer_id,
+    farmer_name: data.profiles?.full_name || "Ramesh Patel",
+    harvest_date: data.harvest_date,
+    quantity_kg: data.quantity_kg,
+    warehouse_id: data.warehouse_id,
+    warehouse_name: wh?.name || "Gwalior Cold Storage Hub",
+    warehouse_city: wh?.location_city || "Gwalior",
+    warehouse_temp: wh?.current_temp_c || 4.2,
+    warehouse_pest_alert: wh?.pest_alert || false,
+    status: data.status,
+  };
+
+  const { remainingDays, freshnessScore } = calculateBatchSpoilage(batchObj, wh);
+  return {
+    ...batchObj,
+    remaining_days_life: remainingDays,
+    freshness_pct: freshnessScore,
+  };
 }
 
-export async function createProduct(product: ProductRecord) {
-  const { data, error } = await supabase
-    .from("products")
-    .insert([product])
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data as ProductRecord;
-}
-
-// ==========================================
-// 🗳️ COMMUNITY POLLS API
-// ==========================================
-
-export async function fetchCommunityPolls() {
-  const { data, error } = await supabase
-    .from("community_polls")
-    .select("*")
-    .order("created_at", { ascending: false });
-
-  if (error || !data || data.length === 0) {
-    return MOCK_POLLS;
-  }
-  return data as CommunityPollRecord[];
-}
-
-export async function voteOnPoll(pollId: string | number, option: "a" | "b" | "c") {
-  const poll = (await fetchCommunityPolls()).find((p) => String(p.id) === String(pollId));
-  if (!poll) return;
-
-  const updateKey = option === "a" ? "votes_a" : option === "b" ? "votes_b" : "votes_c";
-  const currentVal = (poll[updateKey] as number) || 0;
-
-  const { data, error } = await supabase
-    .from("community_polls")
-    .update({ [updateKey]: currentVal + 1 })
-    .eq("id", pollId)
-    .select()
-    .single();
-
-  if (error) return poll;
-  return data as CommunityPollRecord;
-}
-
-// ==========================================
-// 🔐 AUTHENTICATION API
-// ==========================================
-
-export async function signUpWithSupabase(email: string, password: string, role: string, name: string) {
+export async function signUpWithSupabase(email: string, pass: string, role: string, fullName: string) {
   const { data, error } = await supabase.auth.signUp({
     email,
-    password,
-    options: { data: { full_name: name, role: role } },
+    password: pass,
+    options: {
+      data: {
+        full_name: fullName,
+        role: role,
+      },
+    },
   });
-
   if (error) throw error;
   return data;
 }
 
-export async function signInWithSupabase(email: string, password: string) {
+export async function signInWithSupabase(email: string, pass: string) {
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
-    password,
+    password: pass,
   });
-
   if (error) throw error;
   return data;
 }
 
-export async function signOutSupabase() {
-  const { error } = await supabase.auth.signOut();
-  if (error) throw error;
-}
+// =================================================================
+// 4. MOCK DATA FALLBACKS
+// =================================================================
 
-// ==========================================
-// 💡 PRODUCTION-READY SEED DATASET FALLBACKS
-// ==========================================
-
-export const MOCK_WAREHOUSES: WarehouseRecord[] = [
+export const MOCK_WAREHOUSES: Warehouse[] = [
   {
     id: "WH-GWL-01",
     name: "Gwalior Central Cold Depot",
-    city: "Gwalior",
-    state: "Madhya Pradesh",
-    lat: 26.2183,
-    lon: 78.1828,
+    location_city: "Gwalior",
     current_temp_c: 4.2,
     humidity_pct: 85.0,
-    pest_detected: false,
-    storage_capacity_tonnes: 500.0,
-    occupied_capacity_tonnes: 320.0,
+    pest_alert: false,
     rank_score: 98,
-    calculated_rank_score: 98,
-    warehouse_grade: "Grade A (Optimal)",
+    lat: 26.2183,
+    lon: 78.1828,
   },
   {
     id: "WH-NSK-01",
     name: "Nashik Perishable Agri Hub",
-    city: "Nashik",
-    state: "Maharashtra",
+    location_city: "Nashik",
+    current_temp_c: 11.5, // Temp breach!
+    humidity_pct: 92.0,
+    pest_alert: true, // Pest alert!
+    rank_score: 45,
     lat: 19.9975,
     lon: 73.7898,
-    current_temp_c: 11.5, // Temp breach anomaly!
-    humidity_pct: 92.0,
-    pest_detected: true, // Pest warning!
-    storage_capacity_tonnes: 1000.0,
-    occupied_capacity_tonnes: 850.0,
-    rank_score: 45,
-    calculated_rank_score: 45,
-    warehouse_grade: "Grade C (Critical / Action Required)",
   },
   {
     id: "WH-IND-01",
-    name: "Indore Malwa Silo & Storage",
-    city: "Indore",
-    state: "Madhya Pradesh",
-    lat: 22.7196,
-    lon: 75.8577,
+    name: "Indore Malwa Silo Hub",
+    location_city: "Indore",
     current_temp_c: 3.8,
     humidity_pct: 82.0,
-    pest_detected: false,
-    storage_capacity_tonnes: 800.0,
-    occupied_capacity_tonnes: 410.0,
+    pest_alert: false,
     rank_score: 96,
-    calculated_rank_score: 96,
-    warehouse_grade: "Grade A (Optimal)",
-  },
-  {
-    id: "WH-DEL-01",
-    name: "Azadpur Terminal Depot",
-    city: "Delhi",
-    state: "Delhi NCR",
-    lat: 28.7041,
-    lon: 77.1025,
-    current_temp_c: 5.0,
-    humidity_pct: 88.0,
-    pest_detected: false,
-    storage_capacity_tonnes: 1500.0,
-    occupied_capacity_tonnes: 1300.0,
-    rank_score: 91,
-    calculated_rank_score: 91,
-    warehouse_grade: "Grade A (Optimal)",
+    lat: 22.7196,
+    lon: 75.8577,
   },
 ];
 
-export const MOCK_DYNAMIC_PROCUREMENT: DynamicProcurementRecord[] = [
-  {
-    id: 1,
-    batch_code: "LOT-TOM-2026-001",
-    crop_name: "Tomato 🍅",
-    warehouse_id: "WH-NSK-01",
-    original_price_per_kg: 30.0,
-    discount_pct: 60,
-    discounted_price_per_kg: 12.0,
-    spoilage_status: "HIGH SPOILAGE RISK (Temp Breach)",
-    days_until_spoilage: 1,
-  },
-  {
-    id: 2,
-    batch_code: "LOT-MGO-GWL-002",
-    crop_name: "Dasheri Mango 🥭",
-    warehouse_id: "WH-GWL-01",
-    original_price_per_kg: 85.0,
-    discount_pct: 54,
-    discounted_price_per_kg: 39.0,
-    spoilage_status: "HIGH SPOILAGE RISK (Express Dispatch)",
-    days_until_spoilage: 2,
-  },
-  {
-    id: 3,
-    batch_code: "LOT-SPN-2026-003",
-    crop_name: "Spinach 🥬",
-    warehouse_id: "WH-GWL-01",
-    original_price_per_kg: 25.0,
-    discount_pct: 40,
-    discounted_price_per_kg: 15.0,
-    spoilage_status: "MODERATE SPOILAGE RISK",
-    days_until_spoilage: 2,
-  },
-  {
-    id: 4,
-    batch_code: "LOT-ONI-2026-012",
-    crop_name: "Onion 🧅",
-    warehouse_id: "WH-IND-01",
-    original_price_per_kg: 20.0,
-    discount_pct: 0,
-    discounted_price_per_kg: 20.0,
-    spoilage_status: "FRESH",
-    days_until_spoilage: 80,
-  },
-];
-
-export const MOCK_HERBS: HerbRecord[] = [
-  {
-    id: "herb-gwl-mango",
-    name: "Gwalior Dasheri Mangoes 🥭",
-    botanical_name: "Mangifera indica",
-    category: "Fruit (Ultra-High Perishability)",
-    origin: "Gwalior Orchards, MP (26.2183° N, 78.1828° E)",
-    harvest_date: "2026-08-05",
-    quality_grade: "Grade A Premium",
-    lab_tested: true,
-    perishability_priority: 1, // Priority 1 Express!
-    days_to_spoil: 2,
-    gps_coordinates: "26.2183, 78.1828",
-    qr_code_url: "https://ayutrace1.vercel.app/herbs/herb-gwl-mango",
-  },
-  {
-    id: "b0000000-0000-0000-0000-000000000001",
-    name: "Red Organic Tomatoes 🍅",
-    botanical_name: "Solanum lycopersicum",
-    category: "Vegetable (High Perishability)",
-    origin: "Vidisha / Nashik Collective (23.5257° N, 77.8081° E)",
-    harvest_date: "2026-08-04",
-    quality_grade: "Grade A",
-    lab_tested: true,
-    perishability_priority: 1, // Priority 1 Express!
-    days_to_spoil: 1,
-    gps_coordinates: "19.9975, 73.7898",
-    qr_code_url: "https://ayutrace1.vercel.app/certs/LOT-TOM-2026-001.pdf",
-  },
-  {
-    id: "b0000000-0000-0000-0000-000000000002",
-    name: "Pure Organic Ashwagandha 🌿",
-    botanical_name: "Withania somnifera",
-    category: "Ayurvedic Herb (Low Perishability)",
-    origin: "Vidisha Organic Farmers Collective, MP",
-    harvest_date: "2026-07-26",
-    quality_grade: "Grade A+",
-    lab_tested: true,
-    perishability_priority: 3, // Priority 3 Standard!
-    days_to_spoil: 180,
-    gps_coordinates: "23.5257, 77.8081",
-    qr_code_url: "https://ayutrace1.vercel.app/certs/LOT-ASH-2026-004.pdf",
-  },
-];
-
-export const MOCK_CROP_REGIONS: (CropRegionRecord & { recommended_alternative_crop?: string })[] = [
+export const MOCK_CROP_REGIONS: CropRegion[] = [
   {
     id: "reg-gwl",
-    region_name: "Gwalior Fruit Belt",
+    region_name: "Gwalior Agri Belt",
     state: "Madhya Pradesh",
-    major_crop: "Dasheri Mango 🥭",
+    major_crop: "Dasheri Mangoes",
     production_status: "Overproduction Risk",
-    estimated_yield_tons: 32000,
-    active_farmers_count: 2100,
+    estimated_yield_tons: 4200,
+    active_farmers_count: 1240,
     geo_coords: "26.2183, 78.1828",
-    recommended_alternative_crop: "Shift 30% area to Guava 🍐 or Mustard 🌾 (High Spoilage Risk - Express Dispatch!)",
+    recommended_alternative_crop: "Shift 25% area to Ashwagandha & Guava for stable market prices",
   },
   {
-    id: "reg-1",
-    region_name: "Nashik Tomato & Grape Belt",
+    id: "reg-nsk",
+    region_name: "Nashik Perishable Zone",
     state: "Maharashtra",
-    major_crop: "Red Tomato 🍅",
+    major_crop: "Red Tomatoes",
     production_status: "Overproduction Risk",
-    estimated_yield_tons: 48000,
-    active_farmers_count: 3400,
+    estimated_yield_tons: 6800,
+    active_farmers_count: 2150,
     geo_coords: "19.9975, 73.7898",
-    recommended_alternative_crop: "Spinach 🥬 or Pulses (To prevent 40% market loss)",
+    recommended_alternative_crop: "High spoilage risk detected! Utilize express refrigerated transit to Navi Mumbai APMC",
   },
   {
-    id: "reg-ind",
-    region_name: "Indore Malwa Agriculture Belt",
-    state: "Madhya Pradesh",
-    major_crop: "Onion & Wheat 🧅",
+    id: "reg-las",
+    region_name: "Lasalgaon Market Hub",
+    state: "Maharashtra",
+    major_crop: "Red Onions",
     production_status: "Optimal",
-    estimated_yield_tons: 65000,
-    active_farmers_count: 4100,
-    geo_coords: "22.7196, 75.8577",
-    recommended_alternative_crop: "Safe Ambient Silo Storage (Priority 3 Standard Transport)",
+    estimated_yield_tons: 12500,
+    active_farmers_count: 3400,
+    geo_coords: "20.1477, 74.2307",
+    recommended_alternative_crop: "High shelf life (90 Days). Standard ventilated transit recommended",
   },
 ];
 
-export const MOCK_PRODUCTS: ProductRecord[] = [
+export const MOCK_HARVEST_BATCHES: HarvestBatch[] = [
   {
-    id: "prod-1",
-    title: "Fresh Organic Tomato Puree (500g)",
-    description: "Derived from Lot LOT-TOM-2026-001 (Vidisha/Nashik harvest). Lab tested for 96.5% purity.",
-    price: 120,
-    discount_price: 48,
-    is_clearance: true,
-    category: "Fresh Vegetables",
-    image_url: "https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=500&q=80",
-    batch_number: "AYU-TOM-88912",
-    freshness_score: 75,
-    stock_quantity: 45,
+    batch_id: "b0000000-0000-0000-0000-000000000001",
+    crop_name: "Tomato",
+    farmer_name: "Ramesh Patel (Vidisha Collective)",
+    harvest_date: "2026-08-05",
+    quantity_kg: 2500,
+    warehouse_id: "WH-NSK-01",
+    warehouse_name: "Nashik Perishable Agri Hub",
+    warehouse_city: "Nashik",
+    warehouse_temp: 11.5,
+    warehouse_pest_alert: true,
+    status: "in_transit",
+    remaining_days_life: 1,
+    freshness_pct: 70,
+    original_price: 30,
+    discount_pct: 50,
+    discounted_price: 15,
   },
   {
-    id: "prod-mango-gwl",
-    title: "Gwalior Sweet Dasheri Mangoes 🥭 (4 kg Box)",
-    description: "High perishability batch nearing peak ripeness! Priority 1 Cold-Chain Express shipping to prevent spoilage.",
-    price: 350,
-    discount_price: 160,
+    batch_id: "b0000000-0000-0000-0000-000000000002",
+    crop_name: "Dasheri Mango",
+    farmer_name: "Vikram Singh (Gwalior Hub)",
+    harvest_date: "2026-08-04",
+    quantity_kg: 1800,
+    warehouse_id: "WH-GWL-01",
+    warehouse_name: "Gwalior Central Cold Depot",
+    warehouse_city: "Gwalior",
+    warehouse_temp: 4.2,
+    warehouse_pest_alert: false,
+    status: "stored",
+    remaining_days_life: 2,
+    freshness_pct: 74,
+    original_price: 85,
+    discount_pct: 50,
+    discounted_price: 42.5,
+  },
+];
+
+export const MOCK_PRODUCTS: ProductItem[] = [
+  {
+    id: "prod-1",
+    title: "Gwalior Fresh Dasheri Mangoes (Flash Sale)",
+    description: "Picked fresh from Gwalior orchards. High spoilage risk - 54% clearance discount!",
+    price: 85,
+    discount_price: 39,
     is_clearance: true,
-    category: "Fresh Fruits",
-    image_url: "https://images.unsplash.com/photo-1553279768-865429fa0078?w=500&q=80",
-    batch_number: "BATCH-MGO-GWL-2026",
-    freshness_score: 74,
-    stock_quantity: 30,
+    category: "Fruits",
+    image_url: "https://images.unsplash.com/photo-1553279768-865429fa0078?auto=format&fit=crop&q=80&w=800",
+    batch_number: "GWL-MNG-2026",
+    seller_name: "Gwalior Farmer Collective",
+    freshness_score: 82,
+    days_remaining: 2,
   },
   {
     id: "prod-2",
-    title: "Pure Organic Ashwagandha Powder 250g",
-    description: "Certified pesticide-free Ashwagandha from Vidisha Farmers Collective. Full QR lab audit trail.",
-    price: 450,
-    discount_price: 450,
+    title: "Nashik Organic Farm Red Tomatoes",
+    description: "Farm-fresh tomatoes from Nashik perishable zone. Express cold-chain routed.",
+    price: 40,
+    discount_price: 20,
+    is_clearance: true,
+    category: "Vegetables",
+    image_url: "https://images.unsplash.com/photo-1592924357228-91a4daadcfea?auto=format&fit=crop&q=80&w=800",
+    batch_number: "NSK-TOM-2026",
+    seller_name: "Nashik Organic Cooperative",
+    freshness_score: 75,
+    days_remaining: 3,
+  },
+  {
+    id: "prod-3",
+    title: "Lasalgaon Red Onions (Premium Storage)",
+    description: "High shelf-life premium onions stored at optimal ventilated humidity.",
+    price: 30,
+    discount_price: 30,
     is_clearance: false,
-    category: "Ayurvedic Herb",
-    image_url: "https://images.unsplash.com/photo-1618512496248-a07fe83aa8cb?w=500&q=80",
-    batch_number: "AYU-ASH-10042",
-    freshness_score: 99,
-    stock_quantity: 120,
+    category: "Vegetables",
+    image_url: "https://images.unsplash.com/photo-1618512496248-a07fe83aa8cb?auto=format&fit=crop&q=80&w=800",
+    batch_number: "LAS-ONN-2026",
+    seller_name: "Lasalgaon Agri Hub",
+    freshness_score: 95,
+    days_remaining: 45,
   },
 ];
 
-export const MOCK_POLLS: CommunityPollRecord[] = [
+export const MOCK_POLLS: PollItem[] = [
   {
-    id: 1,
-    title: "Rabi Season Planting Advisory - Vidisha/Gwalior Belt",
-    target_audience: "farmers",
-    option_a: "Shift 30% area to Pulses",
-    votes_a: 142,
-    option_b: "Continue Tomato Cultivation",
-    votes_b: 45,
-    option_c: "Switch to Organic Ashwagandha",
-    votes_c: 89,
-    advisory_recommendation: "RECOMMENDED: High market risk for Tomato overproduction. Shift to Pulses/Ashwagandha.",
+    id: "poll-1",
+    title: "Gwalior Region Sowing Balance",
+    crop_name: "Dasheri Mangoes vs Ashwagandha",
+    target_demand_tons: 3500,
+    farmer_votes: 124,
+    consumer_votes: 450,
+    advisory_recommendation: "Reduce Mango area by 20% to avoid regional spoilage gluts.",
   },
+];
+
+export const MOCK_HERBS = [
   {
-    id: 2,
-    title: "Consumer Direct Demand Poll - Festival Season",
-    target_audience: "consumers",
-    option_a: "Organic Herbal Teas",
-    votes_a: 310,
-    option_b: "Fresh Chemical-Free Vegetables",
-    votes_b: 520,
-    option_c: "Ayurvedic Wellness Supplements",
-    votes_c: 210,
-    advisory_recommendation: "High consumer demand detected for Chemical-Free Vegetables in Metro Hubs.",
+    id: "herb-1",
+    name: "Ashwagandha (Organic Roots)",
+    botanical_name: "Withania somnifera",
+    category: "Medicinal Roots",
+    origin: "Vidisha, Madhya Pradesh",
+    harvest_date: "2026-08-01",
+    quality_grade: "Grade A+",
+    lab_tested: true,
   },
 ];

@@ -18,6 +18,7 @@ import LoginPage from "@/pages/login";
 import RegisterPage from "@/pages/register";
 import DashboardPage from "@/pages/dashboard";
 import OrdersPage from "@/pages/orders";
+import TracePage from "@/pages/trace";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -93,6 +94,7 @@ function Router() {
           <Route path="/register" component={RegisterPage} />
           <Route path="/dashboard" component={DashboardPage} />
           <Route path="/orders" component={OrdersPage} />
+          <Route path="/trace/:id" component={TracePage} />
           <Route component={NotFound} />
         </Switch>
       </main>
