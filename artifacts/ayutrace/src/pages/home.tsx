@@ -1,226 +1,124 @@
-import { Link, useLocation } from "wouter";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { useLocation } from "wouter";
 import {
-  useGetTrendingHerbs,
-  useGetProductAnnouncements,
-  useListCommunityPosts,
-} from "@workspace/api-client-react";
-import { ArrowRight, Leaf, MapPin, ShieldCheck, Zap, ChevronLeft, ChevronRight } from "lucide-react";
-import { useRef, useState } from "react";
-
-function HeroSection() {
-  const [, setLocation] = useLocation();
-  return (
-    <section className="relative min-h-[90vh] flex items-center justify-center overflow-hidden">
-      <div
-        className="absolute inset-0 bg-cover bg-center"
-        style={{
-          backgroundImage:
-            "url('https://images.unsplash.com/photo-1591167525664-84a57716c8c0?w=1600&q=80')",
-        }}
-      />
-      <div className="absolute inset-0 bg-gradient-to-b from-background/90 via-background/60 to-background" />
-      <div className="relative z-10 text-center max-w-4xl mx-auto px-4 space-y-8">
-        <Badge className="text-xs font-semibold px-4 py-1.5 rounded-full bg-primary/20 text-primary border border-primary/30">
-          Soil to Shelf Traceability
-        </Badge>
-        <h1 className="text-5xl md:text-7xl font-serif font-bold tracking-tight leading-tight">
-          The Future of{" "}
-          <span className="text-primary">Ayurvedic</span>{" "}
-          Supply Chain
-        </h1>
-        <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-          Trace every herb from farm to your hands. AyuTraceChain brings radical
-          transparency to India's ancient botanical ecosystem — verified,
-          immutable, and beautifully accessible.
-        </p>
-        <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <Button size="lg" className="gap-2 text-base font-semibold px-8" onClick={() => setLocation("/map")}>
-            <MapPin className="w-5 h-5" /> Explore the Map
-          </Button>
-          <Button size="lg" variant="outline" className="gap-2 text-base px-8" onClick={() => setLocation("/herbs")}>
-            Browse Herbs <ArrowRight className="w-4 h-4" />
-          </Button>
-        </div>
-        <div className="flex items-center justify-center gap-8 pt-4 text-sm text-muted-foreground">
-          <div className="flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-primary" /> Verified Supply Chains</div>
-          <div className="flex items-center gap-2"><Leaf className="w-4 h-4 text-primary" /> 100+ Herb Varieties</div>
-          <div className="flex items-center gap-2"><Zap className="w-4 h-4 text-primary" /> Real-time Tracking</div>
-        </div>
-      </div>
-      <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-background to-transparent" />
-    </section>
-  );
-}
-
-function HorizontalScroll({ children, title, viewAllHref }: { children: React.ReactNode; title: string; viewAllHref: string }) {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const scroll = (dir: number) => {
-    if (scrollRef.current) scrollRef.current.scrollBy({ left: dir * 300, behavior: "smooth" });
-  };
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between px-4 md:px-8">
-        <h2 className="text-2xl font-serif font-bold">{title}</h2>
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={() => scroll(-1)} className="rounded-full"><ChevronLeft className="w-5 h-5" /></Button>
-          <Button variant="ghost" size="icon" onClick={() => scroll(1)} className="rounded-full"><ChevronRight className="w-5 h-5" /></Button>
-          <Link href={viewAllHref} className="text-sm text-primary hover:underline ml-2">View all</Link>
-        </div>
-      </div>
-      <div ref={scrollRef} className="flex gap-4 overflow-x-auto pb-4 px-4 md:px-8 scrollbar-hide snap-x snap-mandatory" style={{ scrollbarWidth: "none" }}>
-        {children}
-      </div>
-    </div>
-  );
-}
-
-function TrendingHerbs() {
-  const { data, isLoading } = useGetTrendingHerbs();
-  const herbs = data?.herbs ?? [];
-  return (
-    <HorizontalScroll title="Trending Herbs" viewAllHref="/herbs">
-      {isLoading
-        ? Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="snap-start shrink-0 w-52">
-              <Skeleton className="h-52 w-52 rounded-xl" />
-              <Skeleton className="h-4 w-32 mt-2 rounded" />
-            </div>
-          ))
-        : herbs.map((herb) => (
-            <Link key={herb.id} href={`/herbs/${herb.id}`} className="snap-start shrink-0 w-52 group cursor-pointer">
-              <div className="relative h-52 rounded-xl overflow-hidden border border-border">
-                <div
-                  className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105"
-                  style={{ backgroundImage: `url('https://images.unsplash.com/photo-1600298882525-9c9ba0a7db68?w=400&q=70')` }}
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-transparent to-transparent" />
-                <div className="absolute bottom-3 left-3 right-3">
-                  <p className="text-xs text-primary font-semibold">{herb.region}</p>
-                  <p className="text-sm font-semibold text-foreground truncate">{herb.name}</p>
-                  <p className="text-xs text-muted-foreground italic truncate">{herb.botanicalName}</p>
-                </div>
-                <div className="absolute top-2 right-2 bg-primary/90 text-primary-foreground text-xs font-bold px-2 py-0.5 rounded-full">
-                  #{herb.trendScore}
-                </div>
-              </div>
-            </Link>
-          ))}
-    </HorizontalScroll>
-  );
-}
-
-function ProductAnnouncements() {
-  const { data, isLoading } = useGetProductAnnouncements();
-  const products = data?.products ?? [];
-  return (
-    <HorizontalScroll title="Latest Product Announcements" viewAllHref="/products">
-      {isLoading
-        ? Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="snap-start shrink-0 w-64">
-              <Skeleton className="h-40 w-64 rounded-xl" />
-              <Skeleton className="h-4 w-48 mt-2 rounded" />
-            </div>
-          ))
-        : products.map((product) => (
-            <Link key={product.id} href={`/products/${product.id}`} className="snap-start shrink-0 w-64 group">
-              <Card className="border border-border hover:border-primary/40 transition-colors overflow-hidden">
-                <div className="relative h-40 bg-muted">
-                  <div
-                    className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105"
-                    style={{ backgroundImage: `url('https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&q=70')` }}
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-card/80 to-transparent" />
-                  {product.isNew && (
-                    <Badge className="absolute top-2 left-2 bg-primary text-primary-foreground text-xs">New</Badge>
-                  )}
-                </div>
-                <CardContent className="p-3">
-                  <p className="font-semibold text-sm truncate">{product.name}</p>
-                  <div className="flex items-center justify-between mt-1">
-                    <p className="text-primary font-bold">₹{product.price}</p>
-                    <p className="text-xs text-muted-foreground">{product.sellerName}</p>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-          ))}
-    </HorizontalScroll>
-  );
-}
-
-function CommunityPreviews() {
-  const { data, isLoading } = useListCommunityPosts({ limit: 6 });
-  const posts = data?.posts ?? [];
-  return (
-    <HorizontalScroll title="Community Highlights" viewAllHref="/community">
-      {isLoading
-        ? Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="snap-start shrink-0 w-72">
-              <Skeleton className="h-36 w-72 rounded-xl" />
-            </div>
-          ))
-        : posts.map((post) => (
-            <Link key={post.id} href="/community" className="snap-start shrink-0 w-72 group">
-              <Card className="border border-border hover:border-primary/30 transition-colors h-40 flex flex-col">
-                <CardContent className="p-4 flex-1 flex flex-col justify-between">
-                  <div>
-                    <Badge variant="outline" className="text-xs mb-2 capitalize">{post.category}</Badge>
-                    <p className="font-semibold text-sm line-clamp-2 leading-snug">{post.title}</p>
-                  </div>
-                  <div className="flex items-center justify-between mt-2">
-                    <p className="text-xs text-muted-foreground">{post.authorName}</p>
-                    <p className="text-xs text-muted-foreground">{post.likes} likes</p>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-          ))}
-    </HorizontalScroll>
-  );
-}
-
-function FeatureGrid() {
-  const features = [
-    { icon: <MapPin className="w-6 h-6 text-primary" />, title: "Geographic Tracing", desc: "See exactly which region of India your herbs come from, down to the district." },
-    { icon: <ShieldCheck className="w-6 h-6 text-primary" />, title: "Verified Authenticity", desc: "Every batch is verified at each stage — farm, warehouse, factory, and store." },
-    { icon: <Zap className="w-6 h-6 text-primary" />, title: "QR Traceability", desc: "Scan any product's QR code to view its complete, immutable supply chain journey." },
-    { icon: <Leaf className="w-6 h-6 text-primary" />, title: "Direct from Farms", desc: "Farmers list herbs directly, cutting middlemen and ensuring fair prices for all." },
-  ];
-  return (
-    <section className="py-20 px-4 md:px-8">
-      <div className="max-w-6xl mx-auto">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl md:text-4xl font-serif font-bold mb-4">Why AyuTraceChain?</h2>
-          <p className="text-muted-foreground max-w-xl mx-auto">We are rebuilding trust in the Ayurvedic supply chain, one verified batch at a time.</p>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {features.map((f) => (
-            <Card key={f.title} className="border border-border bg-card hover:border-primary/30 transition-colors">
-              <CardContent className="p-6 space-y-3">
-                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">{f.icon}</div>
-                <h3 className="font-serif font-semibold text-lg">{f.title}</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">{f.desc}</p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
+  Sprout,
+  ShieldCheck,
+  Zap,
+  MapPin,
+  Flame,
+  Sparkles,
+  ArrowRight,
+  Truck,
+  Warehouse,
+  Vote,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { DynamicDiscountBanner } from "@/components/discounts/dynamic-discount-banner";
+import { VisionSpoilageScanner } from "@/components/spoilage/vision-scanner";
 
 export default function Home() {
+  const [, setLocation] = useLocation();
+
   return (
-    <div className="space-y-16 pb-20">
-      <HeroSection />
-      <TrendingHerbs />
-      <ProductAnnouncements />
-      <CommunityPreviews />
-      <FeatureGrid />
+    <div className="space-y-16 pb-16">
+      {/* Hero Section */}
+      <section className="relative pt-12 pb-16 px-4 max-w-7xl mx-auto text-center space-y-6">
+        <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/40 text-xs px-3 py-1 animate-pulse">
+          🌱 Zero Spoilage & Smart Supply Chain Platform
+        </Badge>
+        <h1 className="text-4xl md:text-6xl font-serif font-bold tracking-tight max-w-4xl mx-auto leading-tight">
+          Pioneering <span className="text-emerald-400">Zero Food Waste</span> across Farm, Mandi & Retail
+        </h1>
+        <p className="text-muted-foreground text-base md:text-lg max-w-2xl mx-auto">
+          AyuTrace Agri-Fresh combines IoT Cold-Chain Monitoring, GIS Regional Geo-Tagging, AI Crop Advisory, and Computer Vision Freshness Scoring to optimize perishable distribution.
+        </p>
+
+        <div className="flex flex-wrap justify-center gap-4 pt-2">
+          <Button
+            size="lg"
+            onClick={() => setLocation("/map")}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2 text-sm font-bold shadow-lg"
+          >
+            <MapPin className="w-4 h-4" /> Explore GIS Map & Cold Hubs
+          </Button>
+          <Button
+            size="lg"
+            variant="outline"
+            onClick={() => setLocation("/products")}
+            className="gap-2 text-sm border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10"
+          >
+            <Flame className="w-4 h-4 text-amber-400" /> Dynamic Rescue Deals
+          </Button>
+        </div>
+      </section>
+
+      {/* Feature Cards Grid */}
+      <section className="max-w-7xl mx-auto px-4 grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Card className="border border-border/60 bg-card hover:border-emerald-500/40 transition-all p-6 space-y-3">
+          <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
+            <Zap className="w-6 h-6" />
+          </div>
+          <h3 className="text-lg font-bold">Priority Transport Routing</h3>
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            Perishable items with short shelf-life (Tomatoes 🍅) get Priority 1 Express Transit, while long-life items (Onions 🧅) use standard routing.
+          </p>
+        </Card>
+
+        <Card className="border border-border/60 bg-card hover:border-emerald-500/40 transition-all p-6 space-y-3">
+          <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400">
+            <Warehouse className="w-6 h-6" />
+          </div>
+          <h3 className="text-lg font-bold">IoT Cold-Chain Telemetry</h3>
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            City warehouses are ranked live based on temperature, humidity, capacity, and pest risk metrics to ensure optimal storage quality.
+          </p>
+        </Card>
+
+        <Card className="border border-border/60 bg-card hover:border-emerald-500/40 transition-all p-6 space-y-3">
+          <div className="w-12 h-12 rounded-2xl bg-primary/20 border border-primary/40 flex items-center justify-center text-primary">
+            <Sparkles className="w-6 h-6" />
+          </div>
+          <h3 className="text-lg font-bold">AI Computer Vision Scanner</h3>
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            Scan any crop photo to get a 0-100% freshness score, spoilage stage prediction, and automated clearance discount suggestions.
+          </p>
+        </Card>
+      </section>
+
+      {/* Dynamic Flash Discount Section */}
+      <section className="max-w-7xl mx-auto px-4">
+        <DynamicDiscountBanner />
+      </section>
+
+      {/* Computer Vision Scanner Showcase */}
+      <section className="max-w-7xl mx-auto px-4">
+        <VisionSpoilageScanner />
+      </section>
+
+      {/* Call to Action for Farmers & Community */}
+      <section className="max-w-7xl mx-auto px-4">
+        <Card className="border-2 border-emerald-500/30 bg-gradient-to-r from-emerald-950/40 via-card to-background p-8 rounded-3xl text-center md:text-left flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="space-y-2 max-w-2xl">
+            <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/40 text-xs">
+              Kisan-Grahak Community
+            </Badge>
+            <h2 className="text-2xl md:text-3xl font-serif font-bold">
+              Join the Demand-Supply Crop Balancing Polls
+            </h2>
+            <p className="text-xs md:text-sm text-muted-foreground">
+              Vote on upcoming crop sowings, receive crop protection AI advice, and prevent regional overproduction.
+            </p>
+          </div>
+          <Button
+            size="lg"
+            onClick={() => setLocation("/community")}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2 font-bold shrink-0"
+          >
+            <Vote className="w-4 h-4" /> Open Community Hub <ArrowRight className="w-4 h-4" />
+          </Button>
+        </Card>
+      </section>
     </div>
   );
 }

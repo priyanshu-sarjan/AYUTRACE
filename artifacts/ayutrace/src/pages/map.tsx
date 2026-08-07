@@ -1,76 +1,72 @@
-import { useState, useEffect } from "react";
-import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from "react-leaflet";
+import { useState } from "react";
+import { MapContainer, TileLayer, Marker, Popup, Polyline } from "react-leaflet";
 import L from "leaflet";
-import { useGetHerbMapPins, useGetSupplyChainJourney } from "@workspace/api-client-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Leaf, MapPin, CheckCircle, Circle, ArrowRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  MapPin,
+  Thermometer,
+  ShieldCheck,
+  AlertTriangle,
+  Zap,
+  Warehouse,
+  Truck,
+  Sprout,
+  CheckCircle2,
+  AlertCircle,
+} from "lucide-react";
+import { MOCK_WAREHOUSES, MOCK_CROP_REGIONS } from "@/lib/supabase-api";
 
-const STAGE_COLORS: Record<string, string> = {
-  farm: "#22c55e",
-  warehouse: "#f59e0b",
-  factory: "#3b82f6",
-  store: "#a855f7",
-  consumer: "#ec4899",
-};
+// Custom Leaflet Icons for GIS map
+const warehouseIconOk = L.divIcon({
+  className: "",
+  html: `<div style="background:#10b981;width:26px;height:26px;border-radius:50%;border:3px solid white;box-shadow:0 0 10px rgba(16,185,129,0.8);display:flex;align-items:center;justify-content:center;color:white;font-size:12px;font-weight:bold;">📦</div>`,
+  iconSize: [26, 26],
+  iconAnchor: [13, 13],
+});
 
-const STAGE_LABELS: Record<string, string> = {
-  farm: "Farm",
-  warehouse: "Warehouse",
-  factory: "Factory",
-  store: "Store",
-  consumer: "Consumer",
-};
+const warehouseIconWarning = L.divIcon({
+  className: "",
+  html: `<div style="background:#f59e0b;width:26px;height:26px;border-radius:50%;border:3px solid white;box-shadow:0 0 10px rgba(245,158,11,0.8);display:flex;align-items:center;justify-content:center;color:white;font-size:12px;font-weight:bold;">⚠️</div>`,
+  iconSize: [26, 26],
+  iconAnchor: [13, 13],
+});
 
-function createHerbIcon(color: string) {
-  return L.divIcon({
-    className: "",
-    html: `<div style="background:${color};width:14px;height:14px;border-radius:50%;border:2px solid white;box-shadow:0 0 0 2px ${color}44;"></div>`,
-    iconSize: [14, 14],
-    iconAnchor: [7, 7],
-  });
-}
+const farmIcon = L.divIcon({
+  className: "",
+  html: `<div style="background:#22c55e;width:28px;height:28px;border-radius:50%;border:3px solid white;box-shadow:0 0 12px rgba(34,197,94,0.9);display:flex;align-items:center;justify-content:center;color:white;font-size:14px;">🌾</div>`,
+  iconSize: [28, 28],
+  iconAnchor: [14, 14],
+});
 
-function createStageIcon(stage: string) {
-  const color = STAGE_COLORS[stage] ?? "#888";
-  return L.divIcon({
-    className: "",
-    html: `<div style="background:${color};width:16px;height:16px;border-radius:50%;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.4);"></div>`,
-    iconSize: [16, 16],
-    iconAnchor: [8, 8],
-  });
-}
+// Priority Transport Polyline Routes
+// Priority 1 Express Route: Gwalior Mangoes 🥭 -> Delhi Azadpur Mandi
+const PRIORITY_1_MANGO_ROUTE: [number, number][] = [
+  [26.2183, 78.1828], // Gwalior Orchards
+  [28.7041, 77.1025], // Delhi Azadpur Hub
+];
 
-const DEMO_BATCHES = ["BATCH-ASH-2024-001", "BATCH-TUR-2024-001", "BATCH-BRA-2024-001"];
+// Priority 1 Express Route: Nashik Tomatoes 🍅 -> Navi Mumbai APMC
+const PRIORITY_1_TOMATO_ROUTE: [number, number][] = [
+  [20.0059, 73.7898], // Nashik Farm
+  [19.0760, 72.9981], // Navi Mumbai Hub
+];
 
-function FitBoundsOnPins({ pins }: { pins: { latitude: number; longitude: number }[] }) {
-  const map = useMap();
-  useEffect(() => {
-    if (pins.length > 0) {
-      const bounds = L.latLngBounds(pins.map((p) => [p.latitude, p.longitude]));
-      map.fitBounds(bounds, { padding: [40, 40] });
-    }
-  }, [pins, map]);
-  return null;
-}
+// Priority 3 Standard Route: Lasalgaon Onions 🧅 -> Kolar Hub
+const PRIORITY_3_ONION_ROUTE: [number, number][] = [
+  [20.1477, 74.2307], // Lasalgaon Onion Belt
+  [13.1367, 78.1291], // Kolar Hub
+];
 
 export default function MapPage() {
-  const { data: pinsData } = useGetHerbMapPins();
-  const pins = pinsData?.pins ?? [];
-  const [selectedBatch, setSelectedBatch] = useState<string | null>(null);
-  const { data: journeyData } = useGetSupplyChainJourney(selectedBatch ?? "BATCH-ASH-2024-001", {
-    query: { enabled: !!selectedBatch, queryKey: ["supply-chain", selectedBatch] },
-  });
-
-  const journeySteps = journeyData?.steps ?? [];
-  const journeyPoints = journeySteps
-    .filter((s) => s.latitude != null && s.longitude != null)
-    .map((s) => [s.latitude!, s.longitude!] as [number, number]);
+  const [selectedRegion, setSelectedRegion] = useState<string>("reg-gwl");
+  const [activeTab, setActiveTab] = useState<"warehouses" | "regions" | "logistics">("regions");
 
   return (
-    <div className="flex flex-col md:flex-row h-[calc(100vh-4rem)] gap-0">
-      <div className="flex-1 relative">
+    <div className="flex flex-col md:flex-row h-[calc(100vh-4rem)] gap-0 bg-background overflow-hidden">
+      {/* GIS Interactive Map Viewport */}
+      <div className="flex-1 relative h-[50vh] md:h-full">
         <MapContainer
           center={[22.5937, 78.9629]}
           zoom={5}
@@ -78,110 +74,278 @@ export default function MapPage() {
           className="z-0"
         >
           <TileLayer
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
-          {pins.length > 0 && <FitBoundsOnPins pins={pins} />}
-          {pins.map((pin) => (
-            <Marker key={pin.id} position={[pin.latitude, pin.longitude]} icon={createHerbIcon("#22c55e")}>
-              <Popup>
-                <div className="text-sm font-semibold">{pin.name}</div>
-                <div className="text-xs text-gray-500">{pin.region}</div>
-              </Popup>
-            </Marker>
-          ))}
-          {selectedBatch && journeyPoints.length > 1 && (
-            <Polyline positions={journeyPoints} color="#f59e0b" weight={3} dashArray="8 6" />
-          )}
-          {selectedBatch &&
-            journeySteps
-              .filter((s) => s.latitude != null && s.longitude != null)
-              .map((step, i) => (
-                <Marker key={i} position={[step.latitude!, step.longitude!]} icon={createStageIcon(step.stage)}>
-                  <Popup>
-                    <div className="text-sm font-bold">{STAGE_LABELS[step.stage]}</div>
-                    <div className="text-xs">{step.location}</div>
-                    {step.notes && <div className="text-xs text-gray-500 mt-1">{step.notes}</div>}
-                  </Popup>
-                </Marker>
-              ))}
+
+          {/* Render City Warehouses Pins */}
+          {MOCK_WAREHOUSES.map((wh) => {
+            const coords = wh.location_coords.split(",").map((c) => parseFloat(c.trim())) as [number, number];
+            return (
+              <Marker
+                key={wh.id}
+                position={coords}
+                icon={wh.pest_alert_status === "Optimal" ? warehouseIconOk : warehouseIconWarning}
+              >
+                <Popup>
+                  <div className="p-1 space-y-1.5 text-xs text-foreground">
+                    <h4 className="font-bold text-sm text-emerald-600 flex items-center gap-1">
+                      <Warehouse className="w-3.5 h-3.5" /> {wh.name}
+                    </h4>
+                    <p className="text-muted-foreground">City: {wh.city}</p>
+                    <div className="grid grid-cols-2 gap-1.5 bg-muted/60 p-2 rounded-lg">
+                      <div>🌡️ Temp: <strong>{wh.temperature_celsius}°C</strong></div>
+                      <div>💧 Humidity: <strong>{wh.humidity_percent}%</strong></div>
+                    </div>
+                    <p className="text-[11px] font-semibold text-amber-600">
+                      Pest Alert: {wh.pest_alert_status} | Quality Rank: #{wh.quality_rank}
+                    </p>
+                  </div>
+                </Popup>
+              </Marker>
+            );
+          })}
+
+          {/* Render Regional Crop Belts Pins */}
+          {MOCK_CROP_REGIONS.map((reg) => {
+            const coords = reg.geo_coords.split(",").map((c) => parseFloat(c.trim())) as [number, number];
+            return (
+              <Marker key={reg.id} position={coords} icon={farmIcon}>
+                <Popup>
+                  <div className="p-1.5 text-xs space-y-1 text-foreground">
+                    <h4 className="font-bold text-sm">{reg.region_name}</h4>
+                    <p>Dominant Crop: <strong>{reg.major_crop}</strong></p>
+                    <p>Status: <span className="text-red-500 font-bold">{reg.production_status}</span></p>
+                    <p>Est. Yield: {reg.estimated_yield_tons.toLocaleString()} Tons</p>
+                    {reg.recommended_alternative_crop && (
+                      <p className="text-emerald-600 font-semibold mt-1">
+                        🌱 Area Advice: {reg.recommended_alternative_crop}
+                      </p>
+                    )}
+                  </div>
+                </Popup>
+              </Marker>
+            );
+          })}
+
+          {/* Polyline Route Priority 1: Gwalior Mangoes 🥭 (Orange Express Polyline) */}
+          <Polyline
+            positions={PRIORITY_1_MANGO_ROUTE}
+            pathOptions={{ color: "#f97316", weight: 5, dashArray: "10, 10" }}
+          />
+
+          {/* Polyline Route Priority 1: Nashik Tomatoes 🍅 (Red Express Polyline) */}
+          <Polyline
+            positions={PRIORITY_1_TOMATO_ROUTE}
+            pathOptions={{ color: "#ef4444", weight: 4, dashArray: "8, 8" }}
+          />
+
+          {/* Polyline Route Priority 3: Lasalgaon Onions 🧅 (Green Standard Polyline) */}
+          <Polyline
+            positions={PRIORITY_3_ONION_ROUTE}
+            pathOptions={{ color: "#10b981", weight: 3 }}
+          />
         </MapContainer>
-        <div className="absolute top-4 left-4 z-10 bg-card/90 backdrop-blur-sm rounded-xl border border-border p-3 flex flex-col gap-2 shadow-lg">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Herb Regions</p>
-          <div className="flex items-center gap-2 text-xs"><span className="w-3 h-3 rounded-full bg-green-500 inline-block" /> Active Cultivation</div>
-          {selectedBatch && (
-            <>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mt-1">Supply Chain</p>
-              {Object.entries(STAGE_LABELS).map(([k, v]) => (
-                <div key={k} className="flex items-center gap-2 text-xs">
-                  <span className="w-3 h-3 rounded-full inline-block" style={{ background: STAGE_COLORS[k] }} /> {v}
-                </div>
-              ))}
-            </>
-          )}
+
+        {/* Floating Route Legend */}
+        <div className="absolute bottom-4 left-4 z-[400] bg-card/95 backdrop-blur-md border border-border/60 p-3.5 rounded-2xl shadow-xl text-xs space-y-2 max-w-[300px]">
+          <h4 className="font-bold flex items-center gap-1.5 text-foreground">
+            <Truck className="w-4 h-4 text-primary" /> Spoilage-Priority Route Queue
+          </h4>
+          <div className="space-y-1.5 text-[11px]">
+            <div className="flex items-center gap-2">
+              <span className="w-5 h-1.5 bg-orange-500 rounded-full inline-block" />
+              <span>Priority 1: Gwalior Mangoes 🥭 (Express 2-Day Life)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-5 h-1.5 bg-red-500 rounded-full inline-block" />
+              <span>Priority 1: Nashik Tomatoes 🍅 (Express 3-Day Life)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-5 h-1.5 bg-emerald-500 rounded-full inline-block" />
+              <span>Priority 3: Lasalgaon Onions 🧅 (Standard 45-Day Life)</span>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="w-full md:w-80 bg-card border-l border-border overflow-y-auto flex flex-col">
-        <div className="p-4 border-b border-border">
-          <h2 className="font-serif font-bold text-lg flex items-center gap-2">
-            <MapPin className="w-5 h-5 text-primary" /> Supply Chain Tracer
+      {/* Sidebar Controls & Regional Farmer Advice */}
+      <div className="w-full md:w-[420px] bg-card border-l border-border/60 p-4 space-y-4 overflow-y-auto custom-scrollbar">
+        <div>
+          <h2 className="text-xl font-serif font-bold flex items-center gap-2">
+            <MapPin className="w-5 h-5 text-primary" /> Regional Crop GIS & Spoilage Control
           </h2>
-          <p className="text-xs text-muted-foreground mt-1">Select a batch to animate its journey across India</p>
-        </div>
-        <div className="p-4 space-y-2">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Select Batch</p>
-          {DEMO_BATCHES.map((b) => (
-            <Button
-              key={b}
-              variant={selectedBatch === b ? "default" : "outline"}
-              size="sm"
-              className="w-full justify-start font-mono text-xs"
-              onClick={() => setSelectedBatch(selectedBatch === b ? null : b)}
-            >
-              {b}
-            </Button>
-          ))}
-        </div>
-        {selectedBatch && journeyData && (
-          <div className="p-4 flex-1">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-4">Journey: {journeyData.herbName}</p>
-            <div className="space-y-0">
-              {journeyData.steps.map((step, i) => (
-                <div key={i} className="flex gap-3">
-                  <div className="flex flex-col items-center">
-                    <div
-                      className="w-8 h-8 rounded-full flex items-center justify-center border-2 shrink-0"
-                      style={{ borderColor: STAGE_COLORS[step.stage], backgroundColor: STAGE_COLORS[step.stage] + "22" }}
-                    >
-                      {step.verified ? (
-                        <CheckCircle className="w-4 h-4" style={{ color: STAGE_COLORS[step.stage] }} />
-                      ) : (
-                        <Circle className="w-4 h-4 text-muted-foreground" />
-                      )}
-                    </div>
-                    {i < journeyData.steps.length - 1 && (
-                      <div className="w-px flex-1 bg-border my-1" />
-                    )}
-                  </div>
-                  <div className="pb-4">
-                    <p className="font-semibold text-sm capitalize">{STAGE_LABELS[step.stage]}</p>
-                    <p className="text-xs text-muted-foreground">{step.location}</p>
-                    {step.notes && <p className="text-xs text-muted-foreground/70 italic mt-0.5">{step.notes}</p>}
-                    <p className="text-xs text-primary/80 mt-0.5">
-                      {new Date(step.timestamp).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-        <div className="p-4 border-t border-border">
-          <p className="text-xs text-muted-foreground">
-            {pins.length} herb cultivation zones mapped across India.
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Area-wise crop dominance, cold storage ranks & regional farmer sowing advice
           </p>
         </div>
+
+        {/* Tab Controls */}
+        <div className="grid grid-cols-3 gap-1 bg-muted/60 p-1 rounded-xl">
+          <Button
+            size="sm"
+            variant={activeTab === "regions" ? "default" : "ghost"}
+            onClick={() => setActiveTab("regions")}
+            className="text-xs h-8"
+          >
+            Crop Belts
+          </Button>
+          <Button
+            size="sm"
+            variant={activeTab === "warehouses" ? "default" : "ghost"}
+            onClick={() => setActiveTab("warehouses")}
+            className="text-xs h-8"
+          >
+            Cold Hubs
+          </Button>
+          <Button
+            size="sm"
+            variant={activeTab === "logistics" ? "default" : "ghost"}
+            onClick={() => setActiveTab("logistics")}
+            className="text-xs h-8"
+          >
+            Priority Queue
+          </Button>
+        </div>
+
+        {/* Tab Content 1: GIS Crop Regions & Area-Wise Farmer Advice */}
+        {activeTab === "regions" && (
+          <div className="space-y-3">
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              Regional Crop Dominance & Farmer Recommendations
+            </h3>
+            {MOCK_CROP_REGIONS.map((reg) => (
+              <Card
+                key={reg.id}
+                onClick={() => setSelectedRegion(reg.id)}
+                className={`border cursor-pointer transition-all ${
+                  selectedRegion === reg.id
+                    ? "border-primary bg-primary/10"
+                    : "border-border/60 hover:border-primary/40 bg-background/60"
+                }`}
+              >
+                <CardContent className="p-4 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-bold text-sm text-foreground">{reg.region_name}</h4>
+                    <Badge
+                      className={
+                        reg.production_status === "Overproduction Risk"
+                          ? "bg-red-500/20 text-red-400 border-red-500/40"
+                          : "bg-emerald-500/20 text-emerald-400 border-emerald-500/40"
+                      }
+                    >
+                      {reg.production_status === "Overproduction Risk" && (
+                        <AlertTriangle className="w-3 h-3 mr-1" />
+                      )}
+                      {reg.production_status}
+                    </Badge>
+                  </div>
+
+                  <p className="text-xs text-muted-foreground">
+                    Dominant Crop: <strong className="text-foreground">{reg.major_crop}</strong> ({reg.estimated_yield_tons.toLocaleString()} Tons)
+                  </p>
+
+                  {/* Area-Wise Farmer Crop Advice Box */}
+                  <div className="bg-emerald-950/30 border border-emerald-500/30 rounded-xl p-2.5 text-xs text-emerald-300 space-y-1">
+                    <span className="font-bold flex items-center gap-1 text-[11px] text-emerald-400">
+                      <Sprout className="w-3.5 h-3.5" /> Area-Wise Farmer Advice:
+                    </span>
+                    <p className="text-[11px] leading-tight">
+                      {reg.recommended_alternative_crop || "Maintain current crop rotation balance."}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+
+        {/* Tab Content 2: Warehouses IoT Quality Ranking */}
+        {activeTab === "warehouses" && (
+          <div className="space-y-3">
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              City Warehouse Cold Storage Ranks
+            </h3>
+            {MOCK_WAREHOUSES.map((wh) => (
+              <Card
+                key={wh.id}
+                className="border border-border/60 hover:border-primary/40 transition-all bg-background/60"
+              >
+                <CardContent className="p-3.5 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-bold text-sm flex items-center gap-1.5">
+                      <Warehouse className="w-4 h-4 text-emerald-400" /> {wh.name}
+                    </h4>
+                    <Badge
+                      className={
+                        wh.quality_rank === 1
+                          ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/40"
+                          : "bg-amber-500/20 text-amber-400 border-amber-500/40"
+                      }
+                    >
+                      Rank #{wh.quality_rank}
+                    </Badge>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs pt-1">
+                    <div className="flex items-center gap-1.5 text-muted-foreground">
+                      <Thermometer className="w-3.5 h-3.5 text-blue-400" />
+                      <span>{wh.temperature_celsius}°C (Cold)</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-muted-foreground">
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Pest: {wh.pest_alert_status}</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1 pt-1">
+                    <div className="flex justify-between text-[11px] text-muted-foreground">
+                      <span>Capacity Utilized</span>
+                      <span className="font-bold">{wh.capacity_used_pct}%</span>
+                    </div>
+                    <div className="w-full bg-muted h-1.5 rounded-full overflow-hidden">
+                      <div
+                        className="bg-primary h-full rounded-full"
+                        style={{ width: `${wh.capacity_used_pct}%` }}
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+
+        {/* Tab Content 3: Smart Spoilage Priority Queue */}
+        {activeTab === "logistics" && (
+          <div className="space-y-3">
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              City-Wise Priority Transportation Queue
+            </h3>
+            <Card className="border-orange-500/40 bg-orange-950/20">
+              <CardHeader className="p-3 pb-2">
+                <CardTitle className="text-sm text-orange-400 flex items-center gap-1.5">
+                  <Zap className="w-4 h-4" /> Priority 1: Gwalior Mangoes 🥭 & Nashik Tomatoes 🍅
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-3 pt-0 text-xs space-y-1 text-foreground/90">
+                <p><strong>Gwalior Hub:</strong> Dasheri Mangoes (2 Days Life) &rarr; Refrigerated Express SLA</p>
+                <p><strong>Nashik Hub:</strong> Red Tomatoes (3 Days Life) &rarr; Express Refrigerated Truck</p>
+              </CardContent>
+            </Card>
+
+            <Card className="border-emerald-500/30 bg-emerald-950/20">
+              <CardHeader className="p-3 pb-2">
+                <CardTitle className="text-sm text-emerald-400 flex items-center gap-1.5">
+                  <CheckCircle2 className="w-4 h-4" /> Priority 3: Lasalgaon Red Onions 🧅
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-3 pt-0 text-xs space-y-1 text-foreground/90">
+                <p><strong>Lasalgaon Hub:</strong> Red Onions (45 Days Life) &rarr; Standard Ventilated Transit</p>
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </div>
     </div>
   );

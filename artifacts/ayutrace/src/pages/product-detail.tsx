@@ -1,177 +1,169 @@
-import { useRoute, useLocation } from "wouter";
 import { useState } from "react";
-import { useGetProduct, useGetSupplyChainJourney, useCreateOrder } from "@workspace/api-client-react";
+import { useRoute, useLocation } from "wouter";
+import {
+  ShieldCheck,
+  MapPin,
+  Calendar,
+  Thermometer,
+  QrCode,
+  Truck,
+  ArrowLeft,
+  ShoppingBag,
+  Zap,
+  Award,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/hooks/use-auth";
-import { ArrowLeft, Star, QrCode, CheckCircle, Truck, Building2, Store, User, TreePine, ShoppingCart, Circle } from "lucide-react";
-
-const STAGE_ICONS: Record<string, React.ReactNode> = {
-  farm: <TreePine className="w-4 h-4" />,
-  warehouse: <Building2 className="w-4 h-4" />,
-  factory: <Truck className="w-4 h-4" />,
-  store: <Store className="w-4 h-4" />,
-  consumer: <User className="w-4 h-4" />,
-};
-const STAGE_COLORS: Record<string, string> = {
-  farm: "#22c55e", warehouse: "#f59e0b", factory: "#3b82f6", store: "#a855f7", consumer: "#ec4899",
-};
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { MOCK_PRODUCTS } from "@/lib/supabase-api";
 
 export default function ProductDetail() {
   const [, params] = useRoute("/products/:id");
   const [, setLocation] = useLocation();
-  const { toast } = useToast();
-  const { isAuthenticated } = useAuth();
-  const productId = Number(params?.id);
+  const [showQRModal, setShowQRModal] = useState(false);
 
-  const { data: product, isLoading } = useGetProduct(productId, {
-    query: { enabled: !!productId, queryKey: ["product", productId] },
-  });
+  const product = MOCK_PRODUCTS.find((p) => p.id === params?.id) || MOCK_PRODUCTS[0];
 
-  const batchId = product?.batchId ?? "";
-  const { data: journey } = useGetSupplyChainJourney(batchId, {
-    query: { enabled: !!batchId, queryKey: ["supply-chain", batchId] },
-  });
-
-  const { mutate: createOrder, isPending } = useCreateOrder({
-    mutation: {
-      onSuccess: () => {
-        toast({ title: "Order placed!", description: "Your order has been placed successfully." });
-        setLocation("/orders");
-      },
-      onError: () => toast({ title: "Order failed", description: "Please sign in to place an order.", variant: "destructive" }),
+  const traceTimeline = [
+    {
+      stage: "1. Farm Harvest",
+      location: "Nashik Organic Farm #12, Maharashtra",
+      date: "Aug 06, 2026",
+      status: "Verified Grade A Harvest",
+      icon: "🌾",
     },
-  });
-
-  const handleBuyNow = () => {
-    if (!isAuthenticated) { setLocation("/login"); return; }
-    createOrder({ data: { productId, quantity: 1 } });
-  };
-
-  if (isLoading) {
-    return (
-      <div className="max-w-5xl mx-auto px-4 md:px-8 py-10 space-y-6">
-        <Skeleton className="h-8 w-32" />
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <Skeleton className="h-80 rounded-2xl" />
-          <div className="space-y-4">
-            <Skeleton className="h-8 w-56" />
-            <Skeleton className="h-4 w-40" />
-            <Skeleton className="h-20 w-full" />
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!product) return <div className="p-8 text-center text-muted-foreground">Product not found.</div>;
+    {
+      stage: "2. Cold Storage Hub",
+      location: "Nashik Cold Storage Hub #1 (Temp: 3.8°C)",
+      date: "Aug 06, 2026",
+      status: "IoT Sensor Verified (Humidity 88.5%)",
+      icon: "🏬",
+    },
+    {
+      stage: "3. Priority Transport",
+      location: "Priority 1 Refrigerated Express Transit",
+      date: "Aug 07, 2026",
+      status: "In-Transit to Distribution Hub",
+      icon: "🚛",
+    },
+    {
+      stage: "4. Consumer Retail",
+      location: "AyuTrace Fresh Delivery Hub",
+      date: "Expected Today",
+      status: "Ready for Delivery",
+      icon: "🛒",
+    },
+  ];
 
   return (
-    <div className="max-w-5xl mx-auto px-4 md:px-8 py-10 space-y-8">
-      <Button variant="ghost" className="gap-2 -ml-2" onClick={() => setLocation("/products")}>
+    <div className="max-w-6xl mx-auto px-4 py-8 space-y-8">
+      {/* Back Button */}
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => setLocation("/products")}
+        className="gap-2 text-xs text-muted-foreground hover:text-foreground"
+      >
         <ArrowLeft className="w-4 h-4" /> Back to Marketplace
       </Button>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-        <div className="relative rounded-2xl overflow-hidden h-80 bg-muted">
-          <div
-            className="absolute inset-0 bg-cover bg-center"
-            style={{ backgroundImage: `url('https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=700&q=80')` }}
-          />
+      {/* Main Details Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        {/* Left Column: Product Image & QR Code (5 cols) */}
+        <div className="lg:col-span-5 space-y-4">
+          <div className="relative rounded-2xl overflow-hidden border border-border/60 bg-muted aspect-square shadow-lg">
+            <img
+              src={product.image_url}
+              alt={product.title}
+              className="w-full h-full object-cover"
+            />
+            <Badge className="absolute top-4 left-4 bg-emerald-600 text-white font-bold px-3 py-1 text-xs">
+              <ShieldCheck className="w-3.5 h-3.5 mr-1" /> QR Traceability Verified
+            </Badge>
+          </div>
+
+          <Card
+            onClick={() => setShowQRModal(!showQRModal)}
+            className="border-dashed border-2 border-primary/40 bg-primary/5 hover:bg-primary/10 transition-all cursor-pointer p-4 text-center"
+          >
+            <div className="flex items-center justify-center gap-3">
+              <QrCode className="w-8 h-8 text-primary" />
+              <div className="text-left">
+                <h4 className="font-bold text-sm">Scan QR Code for Live Audit Trail</h4>
+                <p className="text-xs text-muted-foreground">Batch: {product.batch_number}</p>
+              </div>
+            </div>
+          </Card>
         </div>
 
-        <div className="space-y-5">
-          <div>
-            {product.category && <p className="text-xs text-primary font-semibold uppercase tracking-wider mb-1">{product.category}</p>}
-            <h1 className="text-3xl font-serif font-bold">{product.name}</h1>
-            <p className="text-muted-foreground mt-1">{product.sellerName}</p>
+        {/* Right Column: Information & Traceability Timeline (7 cols) */}
+        <div className="lg:col-span-7 space-y-6">
+          <div className="space-y-2 border-b border-border/40 pb-5">
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="text-xs bg-emerald-500/10 text-emerald-400 border-emerald-500/30">
+                {product.category}
+              </Badge>
+              <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30 text-xs">
+                <Zap className="w-3 h-3 mr-1" /> Priority 1 Express
+              </Badge>
+            </div>
+            <h1 className="text-3xl font-serif font-bold">{product.title}</h1>
+            <p className="text-muted-foreground text-sm leading-relaxed">{product.description}</p>
           </div>
 
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1 text-sm">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <Star key={i} className={`w-4 h-4 ${i < Math.round(product.rating ?? 0) ? "fill-primary text-primary" : "text-muted-foreground/30"}`} />
+          {/* Pricing & Order Action */}
+          <div className="flex items-center justify-between bg-card border border-border/60 p-4 rounded-2xl">
+            <div>
+              <span className="text-xs text-muted-foreground block">Guaranteed Price</span>
+              <div className="flex items-baseline gap-2">
+                <span className="text-2xl font-bold text-emerald-400">
+                  ₹{product.discount_price || product.price}
+                </span>
+                {product.discount_price && (
+                  <span className="text-sm line-through text-muted-foreground">₹{product.price}</span>
+                )}
+              </div>
+            </div>
+            <Button size="lg" className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2 font-bold">
+              <ShoppingBag className="w-5 h-5" /> Buy Fresh Batch
+            </Button>
+          </div>
+
+          {/* Freshness Health Metric */}
+          <div className="space-y-2 bg-muted/30 border border-border/50 p-4 rounded-2xl">
+            <div className="flex justify-between text-xs font-medium">
+              <span>Computer Vision Freshness Score</span>
+              <span className="font-bold text-emerald-400">{product.freshness_score}%</span>
+            </div>
+            <Progress value={product.freshness_score} className="h-2.5" />
+          </div>
+
+          {/* Farm-to-Table Supply Chain Traceability Timeline */}
+          <div className="space-y-4">
+            <h3 className="font-serif font-bold text-lg flex items-center gap-2">
+              <Truck className="w-5 h-5 text-primary" /> Farm-to-Table Live Traceability Journey
+            </h3>
+            <div className="space-y-3">
+              {traceTimeline.map((step, idx) => (
+                <div
+                  key={idx}
+                  className="flex gap-3 bg-background border border-border/60 p-3.5 rounded-xl items-start"
+                >
+                  <span className="text-xl p-2 rounded-lg bg-muted shrink-0">{step.icon}</span>
+                  <div className="flex-1 text-xs space-y-1">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-bold text-sm text-foreground">{step.stage}</h4>
+                      <span className="text-[11px] text-muted-foreground">{step.date}</span>
+                    </div>
+                    <p className="text-muted-foreground">{step.location}</p>
+                    <span className="inline-block text-[10px] font-semibold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">
+                      ✓ {step.status}
+                    </span>
+                  </div>
+                </div>
               ))}
             </div>
-            <span className="text-sm text-muted-foreground">({product.reviewCount} reviews)</span>
-          </div>
-
-          {product.description && <p className="text-muted-foreground leading-relaxed">{product.description}</p>}
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className="bg-muted/50 rounded-lg p-3">
-              <p className="text-xs text-muted-foreground">In Stock</p>
-              <p className="font-semibold">{product.stockQty} units</p>
-            </div>
-            {product.herbName && (
-              <div className="bg-muted/50 rounded-lg p-3">
-                <p className="text-xs text-muted-foreground">Herb Source</p>
-                <p className="font-semibold">{product.herbName}</p>
-              </div>
-            )}
-          </div>
-
-          <div className="flex items-center justify-between pt-2">
-            <p className="text-4xl font-bold text-primary">₹{product.price}</p>
-            {product.isNew && <Badge className="bg-primary text-primary-foreground">New Arrival</Badge>}
-          </div>
-
-          <div className="flex gap-3">
-            <Button size="lg" className="flex-1 gap-2" onClick={handleBuyNow} disabled={isPending}>
-              <ShoppingCart className="w-5 h-5" />
-              {isPending ? "Placing..." : "Buy Now"}
-            </Button>
-            {batchId && (
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Button size="lg" variant="outline" className="gap-2">
-                    <QrCode className="w-5 h-5" /> Trace
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-md">
-                  <DialogHeader>
-                    <DialogTitle className="font-serif">Supply Chain Journey</DialogTitle>
-                    <p className="text-xs text-muted-foreground font-mono">{batchId}</p>
-                  </DialogHeader>
-                  {journey ? (
-                    <div className="space-y-0">
-                      {journey.steps.map((step, i) => (
-                        <div key={i} className="flex gap-3">
-                          <div className="flex flex-col items-center">
-                            <div
-                              className="w-9 h-9 rounded-full flex items-center justify-center border-2 shrink-0"
-                              style={{ borderColor: STAGE_COLORS[step.stage] ?? "#888", backgroundColor: (STAGE_COLORS[step.stage] ?? "#888") + "22" }}
-                            >
-                              <span style={{ color: STAGE_COLORS[step.stage] ?? "#888" }}>
-                                {STAGE_ICONS[step.stage] ?? <Circle className="w-4 h-4" />}
-                              </span>
-                            </div>
-                            {i < journey.steps.length - 1 && <div className="w-px flex-1 bg-border my-1" />}
-                          </div>
-                          <div className="pb-4">
-                            <div className="flex items-center gap-2">
-                              <p className="font-semibold text-sm capitalize">{step.stage}</p>
-                              {step.verified && <CheckCircle className="w-3.5 h-3.5 text-green-500" />}
-                            </div>
-                            <p className="text-xs text-muted-foreground">{step.location}</p>
-                            {step.notes && <p className="text-xs text-muted-foreground/70 italic">{step.notes}</p>}
-                            <p className="text-xs text-primary/80">
-                              {new Date(step.timestamp).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
-                            </p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-muted-foreground text-sm">Loading journey...</p>
-                  )}
-                </DialogContent>
-              </Dialog>
-            )}
           </div>
         </div>
       </div>
