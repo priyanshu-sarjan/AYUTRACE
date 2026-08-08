@@ -52,6 +52,8 @@ const PRIORITY_1_TOMATO_ROUTE: [number, number][] = [
   [19.0760, 72.9981], // Navi Mumbai Hub
 ];
 
+import { CropMap } from "@/components/CropMap";
+
 // Priority 3 Standard Route: Lasalgaon Onions 🧅 -> Kolar Hub
 const PRIORITY_3_ONION_ROUTE: [number, number][] = [
   [20.1477, 74.2307], // Lasalgaon Onion Belt
@@ -59,11 +61,47 @@ const PRIORITY_3_ONION_ROUTE: [number, number][] = [
 ];
 
 export default function MapPage() {
+  const [viewMode, setViewMode] = useState<"overproduction" | "logistics">("overproduction");
   const [selectedRegion, setSelectedRegion] = useState<string>("reg-gwl");
   const [activeTab, setActiveTab] = useState<"warehouses" | "regions" | "logistics">("regions");
 
   return (
-    <div className="flex flex-col md:flex-row h-[calc(100vh-4rem)] gap-0 bg-background overflow-hidden">
+    <div className="flex flex-col min-h-[calc(100vh-4rem)] bg-background p-4 space-y-4">
+      {/* View Mode Header Switcher */}
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-card p-3 rounded-2xl border border-border/60 shadow-sm">
+        <div>
+          <h1 className="text-xl font-serif font-bold text-foreground">
+            AYUTRACE GIS Supply Chain & Overproduction Map
+          </h1>
+          <p className="text-xs text-muted-foreground">
+            Real-time district overproduction tracking & agricultural logistics routing
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2 bg-muted/60 p-1 rounded-xl">
+          <Button
+            size="sm"
+            variant={viewMode === "overproduction" ? "default" : "ghost"}
+            onClick={() => setViewMode("overproduction")}
+            className="text-xs h-8 gap-1.5 font-semibold"
+          >
+            🚨 Geo-Tagged Overproduction Map (CSV Dataset)
+          </Button>
+          <Button
+            size="sm"
+            variant={viewMode === "logistics" ? "default" : "ghost"}
+            onClick={() => setViewMode("logistics")}
+            className="text-xs h-8 gap-1.5 font-semibold"
+          >
+            📦 Warehouse & Route GIS
+          </Button>
+        </div>
+      </div>
+
+      {viewMode === "overproduction" ? (
+        <CropMap />
+      ) : (
+        <div className="flex flex-col md:flex-row h-[75vh] gap-0 bg-background overflow-hidden rounded-2xl border border-border/60 shadow-xl relative">
       {/* GIS Interactive Map Viewport */}
       <div className="flex-1 relative h-[50vh] md:h-full">
         <MapContainer
@@ -97,7 +135,7 @@ export default function MapPage() {
                     <h4 className="font-bold text-sm text-emerald-600 flex items-center gap-1">
                       <Warehouse className="w-3.5 h-3.5" /> {wh.name}
                     </h4>
-                    <p className="text-muted-foreground">Location: {(wh as any).city || wh.location_name}, {(wh as any).state || ""}</p>
+                    <p className="text-muted-foreground">Location: {(wh as any).city || (wh as any).location_name}, {(wh as any).state || ""}</p>
                     <div className="grid grid-cols-2 gap-1.5 bg-muted/60 p-2 rounded-lg">
                       <div>🌡️ Temp: <strong>{wh.current_temp_c ?? wh.temperature_celsius}°C</strong></div>
                       <div>💧 Humidity: <strong>{wh.humidity_pct ?? wh.humidity_percent}%</strong></div>
@@ -372,6 +410,13 @@ export default function MapPage() {
           </div>
         )}
       </div>
+      </div>
+      )}
     </div>
   );
 }
+
+
+
+
+
