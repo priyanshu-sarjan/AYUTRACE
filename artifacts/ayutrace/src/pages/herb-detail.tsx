@@ -40,7 +40,7 @@ function SupplyChainModal({ batchId }: { batchId: string }) {
           <div className="space-y-3">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-14 rounded-lg" />)}</div>
         ) : (
           <div className="space-y-0">
-            {steps.map((step, i) => (
+            {steps.map((step: any, i: number) => (
               <div key={i} className="flex gap-3">
                 <div className="flex flex-col items-center">
                   <div
@@ -121,7 +121,7 @@ export default function HerbDetail() {
           </div>
           {herb.uses && <p className="text-sm text-muted-foreground leading-relaxed">{herb.uses}</p>}
           <div className="flex flex-wrap gap-2">
-            {(herb.benefits ?? []).map((b) => (
+            {(herb.benefits ?? []).map((b: string) => (
               <Badge key={b} variant="secondary">{b}</Badge>
             ))}
           </div>

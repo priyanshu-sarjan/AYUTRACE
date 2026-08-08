@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en" class="dark scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AYUTRACE | Sign In & Sign Up</title>
+  <meta name="description" content="AyuTrace Agri-Fresh Platform - Sign In & Sign Up Authentication Portal" />
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Supabase JS Client CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Outfit', 'sans-serif'],
+            serif: ['Playfair Display', 'serif'],
+          },
+          colors: {
+            emerald: {
+              400: '#34d399',
+              500: '#10b981',
+              600: '#059669',
+              950: '#022c22',
+            },
+            amber: {
+              400: '#fbbf24',
+              500: '#f59e0b',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    .glass-card {
+      background: rgba(15, 23, 22, 0.85);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border: 1px solid rgba(16, 185, 129, 0.25);
+    }
+    .glow-emerald {
+      box-shadow: 0 0 50px -10px rgba(16, 185, 129, 0.35);
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans min-h-screen flex flex-col justify-between selection:bg-emerald-500 selection:text-white relative overflow-x-hidden">
+
+  <!-- Ambient Glowing Radial Background Orbs -->
+  <div class="fixed -top-40 left-1/2 -translate-x-1/2 w-[700px] h-[700px] bg-emerald-600/15 rounded-full blur-[140px] pointer-events-none -z-10"></div>
+  <div class="fixed bottom-0 right-0 w-[500px] h-[500px] bg-amber-500/10 rounded-full blur-[120px] pointer-events-none -z-10"></div>
+
+  <!-- Top Brand Navigation Header -->
+  <header class="w-full border-b border-emerald-500/20 bg-slate-950/80 backdrop-blur-md">
+    <div class="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-emerald-600/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 font-bold text-xl shadow-lg shadow-emerald-950/50">
+          🌱
+        </div>
+        <div>
+          <span class="font-serif font-bold text-xl text-white tracking-tight">
+            AyuTrace <span class="text-emerald-400">Agri-Fresh</span>
+          </span>
+          <span class="text-[10px] text-emerald-400/80 block font-mono">Zero Spoilage Network</span>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span class="text-xs text-emerald-400 font-mono hidden sm:inline">Supabase Auth Connected</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Centered Sign In & Sign Up Section -->
+  <main class="flex-1 flex items-center justify-center p-4 sm:p-6 py-12">
+    <div class="w-full max-w-md glass-card rounded-3xl p-6 sm:p-8 glow-emerald space-y-6">
+
+      <!-- Header Icon & Title -->
+      <div class="text-center space-y-2">
+        <div class="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 flex items-center justify-center text-2xl mx-auto shadow-md">
+          🔑
+        </div>
+        <h1 class="text-2xl font-serif font-bold text-white tracking-tight" id="auth-title">Welcome to AyuTrace</h1>
+        <p class="text-xs text-slate-400" id="auth-subtitle">Sign in to manage zero-spoilage cold chain & produce market</p>
+      </div>
+
+      <!-- Tab Buttons: Sign In / Create Account -->
+      <div class="flex bg-slate-900/90 p-1.5 rounded-2xl border border-slate-800">
+        <button id="tab-signin-btn" onclick="switchAuthTab('signin')" class="flex-1 py-2.5 rounded-xl text-xs font-bold transition-all bg-emerald-600 text-white shadow-md">
+          Sign In
+        </button>
+        <button id="tab-signup-btn" onclick="switchAuthTab('signup')" class="flex-1 py-2.5 rounded-xl text-xs font-bold transition-all text-slate-400 hover:text-white">
+          Create Account
+        </button>
+      </div>
+
+      <!-- Role Selector Pills (Visible during Sign Up) -->
+      <div id="role-selector-container" class="hidden space-y-2">
+        <label class="text-xs font-bold text-slate-400 uppercase tracking-wider block">Select Account Role</label>
+        <div class="grid grid-cols-3 gap-2">
+          <button type="button" onclick="selectRole('farmer')" id="role-farmer" class="p-2.5 rounded-xl border border-emerald-500 bg-emerald-950/60 text-emerald-300 text-xs font-bold text-center transition-all cursor-pointer">
+            🌾 Farmer
+          </button>
+          <button type="button" onclick="selectRole('consumer')" id="role-consumer" class="p-2.5 rounded-xl border border-slate-800 bg-slate-900/60 text-slate-400 text-xs font-bold text-center transition-all cursor-pointer">
+            🛒 Buyer
+          </button>
+          <button type="button" onclick="selectRole('seller')" id="role-seller" class="p-2.5 rounded-xl border border-slate-800 bg-slate-900/60 text-slate-400 text-xs font-bold text-center transition-all cursor-pointer">
+            🏪 Mandi
+          </button>
+        </div>
+      </div>
+
+      <!-- Input Form -->
+      <div class="space-y-4">
+        <!-- Email Input -->
+        <div class="space-y-1.5">
+          <label class="block text-xs font-semibold text-slate-300">Email Address</label>
+          <input type="email" id="email" placeholder="farmer@ayutrace.org" class="w-full bg-slate-900/90 border border-slate-800 focus:border-emerald-500 text-white rounded-xl p-3.5 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-all placeholder:text-slate-600" />
+        </div>
+
+        <!-- Password Input -->
+        <div class="space-y-1.5">
+          <div class="flex justify-between items-center">
+            <label class="block text-xs font-semibold text-slate-300">Password</label>
+            <button type="button" onclick="togglePasswordVisibility()" class="text-[11px] text-emerald-400 hover:underline">
+              Show / Hide
+            </button>
+          </div>
+          <input type="password" id="password" placeholder="••••••••" class="w-full bg-slate-900/90 border border-slate-800 focus:border-emerald-500 text-white rounded-xl p-3.5 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-all placeholder:text-slate-600" />
+        </div>
+
+        <!-- Action Buttons -->
+        <div id="signin-actions" class="pt-2">
+          <button onclick="handleSignIn()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3.5 px-4 rounded-xl text-sm transition-all shadow-lg shadow-emerald-950/60 flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98]">
+            <span>Sign In to Dashboard</span> &rarr;
+          </button>
+        </div>
+
+        <div id="signup-actions" class="hidden pt-2">
+          <button onclick="handleSignUp()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3.5 px-4 rounded-xl text-sm transition-all shadow-lg shadow-emerald-950/60 flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98]">
+            <span>Create Free Account</span> &rarr;
+          </button>
+        </div>
+      </div>
+
+      <!-- Quick One-Click Demo Accounts -->
+      <div class="pt-4 border-t border-slate-800 space-y-2">
+        <span class="text-[11px] text-slate-400 font-medium block">Quick Demo Test Accounts:</span>
+        <div class="flex flex-wrap gap-2">
+          <button type="button" onclick="fillDemo('farmer@ayutrace.org', 'farmer123', 'farmer')" class="text-xs px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:border-emerald-500/50 hover:text-emerald-300 transition-all cursor-pointer">
+            🌾 Farmer Demo
+          </button>
+          <button type="button" onclick="fillDemo('buyer@ayutrace.org', 'buyer123', 'consumer')" class="text-xs px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:border-amber-500/50 hover:text-amber-300 transition-all cursor-pointer">
+            🛒 Buyer Demo
+          </button>
+          <button type="button" onclick="fillDemo('mandi@ayutrace.org', 'seller123', 'seller')" class="text-xs px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:border-teal-500/50 hover:text-teal-300 transition-all cursor-pointer">
+            🏪 Mandi Demo
+          </button>
+        </div>
+      </div>
+
+      <!-- Live Status Message Toast -->
+      <div id="status-message" class="hidden p-3.5 rounded-xl text-xs font-medium border transition-all text-center"></div>
+
+      <!-- Direct Web App Link -->
+      <div class="pt-2 text-center">
+        <a href="artifacts/ayutrace/index.html" class="text-xs text-slate-400 hover:text-emerald-400 underline transition-colors">
+          Open Full AyuTrace React App &rarr;
+        </a>
+      </div>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="w-full py-4 text-center border-t border-slate-900 text-xs text-slate-500">
+    AyuTrace Agri-Fresh Platform &copy; 2026. Zero Spoilage Supply Chain Network.
+  </footer>
+
+  <!-- Supabase Auth Logic JavaScript -->
+  <script>
+    // Supabase Credentials - Live Production Instance
+    const supabaseUrl = 'https://eigfrepmbfgioyxejfqt.supabase.co';
+    const supabaseKey = 'sb_publishable_4lWtFcnC0O3zpoDM6Ncr5Q_ALbTLyaH';
+    const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+    let activeTab = 'signin';
+    let selectedRole = 'farmer';
+
+    function switchAuthTab(tab) {
+      activeTab = tab;
+      const signinBtn = document.getElementById('tab-signin-btn');
+      const signupBtn = document.getElementById('tab-signup-btn');
+      const roleContainer = document.getElementById('role-selector-container');
+      const signinActions = document.getElementById('signin-actions');
+      const signupActions = document.getElementById('signup-actions');
+      const title = document.getElementById('auth-title');
+      const subtitle = document.getElementById('auth-subtitle');
+
+      if (tab === 'signin') {
+        signinBtn.className = 'flex-1 py-2.5 rounded-xl text-xs font-bold transition-all bg-emerald-600 text-white shadow-md';
+        signupBtn.className = 'flex-1 py-2.5 rounded-xl text-xs font-bold transition-all text-slate-400 hover:text-white';
+        roleContainer.classList.add('hidden');
+        signinActions.classList.remove('hidden');
+        signupActions.classList.add('hidden');
+        title.innerText = 'Welcome Back';
+        subtitle.innerText = 'Sign in to access your cold-chain dashboard & market orders';
+      } else {
+        signupBtn.className = 'flex-1 py-2.5 rounded-xl text-xs font-bold transition-all bg-emerald-600 text-white shadow-md';
+        signinBtn.className = 'flex-1 py-2.5 rounded-xl text-xs font-bold transition-all text-slate-400 hover:text-white';
+        roleContainer.classList.remove('hidden');
+        signupActions.classList.remove('hidden');
+        signinActions.classList.add('hidden');
+        title.innerText = 'Create New Account';
+        subtitle.innerText = 'Join the zero-spoilage Kisan-Grahak agricultural network';
+      }
+    }
+
+    function selectRole(role) {
+      selectedRole = role;
+      ['farmer', 'consumer', 'seller'].forEach(r => {
+        const btn = document.getElementById(`role-${r}`);
+        if (r === role) {
+          btn.className = 'p-2.5 rounded-xl border border-emerald-500 bg-emerald-950/60 text-emerald-300 text-xs font-bold text-center transition-all cursor-pointer';
+        } else {
+          btn.className = 'p-2.5 rounded-xl border border-slate-800 bg-slate-900/60 text-slate-400 text-xs font-bold text-center transition-all cursor-pointer';
+        }
+      });
+    }
+
+    function togglePasswordVisibility() {
+      const pwd = document.getElementById('password');
+      pwd.type = pwd.type === 'password' ? 'text' : 'password';
+    }
+
+    function fillDemo(email, pwd, role) {
+      document.getElementById('email').value = email;
+      document.getElementById('password').value = pwd;
+      selectRole(role);
+      showStatus(`Loaded ${role} credentials! Click Sign In below.`, 'info');
+    }
+
+    function showStatus(msg, type) {
+      const statusEl = document.getElementById('status-message');
+      statusEl.classList.remove('hidden', 'bg-emerald-950/80', 'text-emerald-300', 'border-emerald-800', 'bg-red-950/80', 'text-red-300', 'border-red-800', 'bg-slate-900', 'text-slate-300', 'border-slate-800');
+
+      if (type === 'error') {
+        statusEl.classList.add('bg-red-950/80', 'text-red-300', 'border-red-800');
+      } else if (type === 'success') {
+        statusEl.classList.add('bg-emerald-950/80', 'text-emerald-300', 'border-emerald-800');
+      } else {
+        statusEl.classList.add('bg-slate-900', 'text-slate-300', 'border-slate-800');
+      }
+
+      statusEl.innerText = msg;
+    }
+
+    async function handleSignUp() {
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value.trim();
+
+      if (!email || !password) {
+        showStatus("Please enter your email and password.", "error");
+        return;
+      }
+
+      if (password.length < 6) {
+        showStatus("Password must be at least 6 characters long.", "error");
+        return;
+      }
+
+      showStatus("Connecting to Supabase - creating account...", "info");
+
+      try {
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: {
+              role: selectedRole,
+              full_name: email.split('@')[0]
+            }
+          }
+        });
+
+        if (error) {
+          showStatus("Sign Up Error: " + error.message, "error");
+        } else if (data?.user && !data.session) {
+          showStatus("Account registered successfully! If email confirmation is enabled in Supabase, please check your email inbox to confirm.", "success");
+        } else if (data?.session) {
+          showStatus(`Account created! Welcome, ${data.user.email}. Redirecting...`, "success");
+          setTimeout(() => {
+            window.location.href = "artifacts/ayutrace/index.html";
+          }, 1500);
+        } else {
+          showStatus("Account created! You can now sign in with your credentials.", "success");
+        }
+      } catch (err) {
+        showStatus("Connection error: " + err.message, "error");
+      }
+    }
+
+    async function handleSignIn() {
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value.trim();
+
+      if (!email || !password) {
+        showStatus("Please enter your email and password.", "error");
+        return;
+      }
+
+      showStatus("Authenticating with Supabase...", "info");
+
+      try {
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+
+        if (error) {
+          showStatus("Sign In Error: " + error.message, "error");
+        } else {
+          showStatus(`Welcome back! Logged in as ${data.user?.email}. Redirecting...`, "success");
+          setTimeout(() => {
+            window.location.href = "artifacts/ayutrace/index.html";
+          }, 1500);
+        }
+      } catch (err) {
+        showStatus("Authentication error: " + err.message, "error");
+      }
+    }
+  </script>
+</body>
+</html>

@@ -37,7 +37,7 @@ function FarmerDash() {
         <div>
           <h2 className="text-xl font-serif font-bold mb-4">Your Herbs</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-            {data.topHerbs.map((herb) => (
+            {data.topHerbs.map((herb: any) => (
               <Link key={herb.id} href={`/herbs/${herb.id}`}>
                 <Card className="border border-border hover:border-primary/30 cursor-pointer transition-colors">
                   <CardContent className="p-4 flex items-center gap-3">
@@ -60,7 +60,7 @@ function FarmerDash() {
         <div>
           <h2 className="text-xl font-serif font-bold mb-4">Recent Orders</h2>
           <div className="space-y-3">
-            {data.recentOrders.map((order) => (
+            {data.recentOrders.map((order: any) => (
               <Card key={order.id} className="border border-border">
                 <CardContent className="p-4 flex items-center justify-between">
                   <div>
@@ -96,7 +96,7 @@ function ConsumerDash() {
             <Link href="/orders" className="text-sm text-primary hover:underline flex items-center gap-1">View all <ArrowRight className="w-3 h-3"/></Link>
           </div>
           <div className="space-y-3">
-            {data.recentOrders.map((order) => (
+            {data.recentOrders.map((order: any) => (
               <Card key={order.id} className="border border-border">
                 <CardContent className="p-4 flex items-center justify-between">
                   <div>
@@ -117,7 +117,7 @@ function ConsumerDash() {
         <div>
           <h2 className="text-xl font-serif font-bold mb-4">Recommended for You</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-            {data.recommendedProducts.map((p) => (
+            {data.recommendedProducts.map((p: any) => (
               <Link key={p.id} href={`/products/${p.id}`}>
                 <Card className="border border-border hover:border-primary/30 cursor-pointer transition-colors">
                   <CardContent className="p-4">
@@ -157,7 +157,7 @@ function SellerDash() {
             <Link href="/products" className="text-sm text-primary hover:underline">View all</Link>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-            {data.topProducts.map((p) => (
+            {data.topProducts.map((p: any) => (
               <Link key={p.id} href={`/products/${p.id}`}>
                 <Card className="border border-border hover:border-primary/30 cursor-pointer transition-colors">
                   <CardContent className="p-4">
@@ -192,7 +192,8 @@ export default function DashboardPage() {
     );
   }
 
-  const roleLabel = { farmer: "Farmer", consumer: "Consumer", seller: "Seller" }[user?.role ?? "consumer"] ?? "Dashboard";
+  const roleMap: Record<string, string> = { farmer: "Farmer", consumer: "Consumer", seller: "Seller" };
+  const roleLabel = roleMap[user?.role ?? "consumer"] ?? "Dashboard";
   const RoleDash = user?.role === "farmer" ? FarmerDash : user?.role === "seller" ? SellerDash : ConsumerDash;
 
   return (

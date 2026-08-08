@@ -90,20 +90,20 @@ export default function MapPage() {
               <Marker
                 key={wh.id}
                 position={coords}
-                icon={wh.pest_detected || wh.pest_alert_status === "Warning" ? warehouseIconWarning : warehouseIconOk}
+                icon={(wh as any).pest_detected || wh.pest_alert_status === "Warning" ? warehouseIconWarning : warehouseIconOk}
               >
                 <Popup>
                   <div className="p-1 space-y-1.5 text-xs text-foreground">
                     <h4 className="font-bold text-sm text-emerald-600 flex items-center gap-1">
                       <Warehouse className="w-3.5 h-3.5" /> {wh.name}
                     </h4>
-                    <p className="text-muted-foreground">City: {wh.city}, {wh.state}</p>
+                    <p className="text-muted-foreground">Location: {(wh as any).city || wh.location_name}, {(wh as any).state || ""}</p>
                     <div className="grid grid-cols-2 gap-1.5 bg-muted/60 p-2 rounded-lg">
                       <div>🌡️ Temp: <strong>{wh.current_temp_c ?? wh.temperature_celsius}°C</strong></div>
                       <div>💧 Humidity: <strong>{wh.humidity_pct ?? wh.humidity_percent}%</strong></div>
                     </div>
                     <p className="text-[11px] font-semibold text-amber-600">
-                      Pest Alert: {wh.pest_detected ? "Detected ⚠️" : "Optimal"} | Rank Score: #{wh.calculated_rank_score ?? wh.rank_score}
+                      Pest Alert: {(wh as any).pest_detected ? "Detected ⚠️" : "Optimal"} | Rank Score: #{wh.calculated_rank_score ?? wh.rank_score}
                     </p>
                   </div>
                 </Popup>
@@ -303,7 +303,7 @@ export default function MapPage() {
                     </div>
                     <div className="flex items-center gap-1.5 text-muted-foreground">
                       <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                      <span>Pest: {wh.pest_detected ? "Detected ⚠️" : "Optimal"}</span>
+                      <span>Pest: {(wh as any).pest_detected ? "Detected ⚠️" : "Optimal"}</span>
                     </div>
                   </div>
 
@@ -312,8 +312,8 @@ export default function MapPage() {
                       <span>Occupied Capacity</span>
                       <span className="font-bold">
                         {Math.round(
-                          ((wh.occupied_capacity_tonnes ?? wh.capacity_used_pct) /
-                            (wh.storage_capacity_tonnes ?? 100)) *
+                          (((wh.occupied_capacity_tonnes ?? (wh as any).capacity_used_pct ?? 50) as number) /
+                            ((wh.storage_capacity_tonnes ?? 100) as number)) *
                             100
                         )}
                         %
@@ -326,8 +326,8 @@ export default function MapPage() {
                           width: `${Math.min(
                             100,
                             Math.round(
-                              ((wh.occupied_capacity_tonnes ?? wh.capacity_used_pct) /
-                                (wh.storage_capacity_tonnes ?? 100)) *
+                              (((wh.occupied_capacity_tonnes ?? (wh as any).capacity_used_pct ?? 50) as number) /
+                                ((wh.storage_capacity_tonnes ?? 100) as number)) *
                                 100
                             )
                           )}%`,

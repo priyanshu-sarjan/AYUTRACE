@@ -50,7 +50,7 @@ function OrderTracker({ orderId }: { orderId: number }) {
               <Badge className="capitalize">{journey.currentStage}</Badge>
             </div>
             <div className="space-y-0">
-              {journey.steps.map((step, i) => (
+              {journey.steps.map((step: any, i: number) => (
                 <div key={i} className="flex gap-3">
                   <div className="flex flex-col items-center">
                     <div
@@ -118,7 +118,7 @@ export default function OrdersPage() {
         </div>
       ) : (
         <div className="space-y-4">
-          {orders.map((order) => (
+          {orders.map((order: any) => (
             <Card key={order.id} className="border border-border">
               <CardContent className="p-5 flex flex-col sm:flex-row gap-4 sm:items-center justify-between">
                 <div className="flex items-center gap-4">

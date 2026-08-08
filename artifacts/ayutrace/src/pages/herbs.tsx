@@ -58,7 +58,7 @@ export default function HerbsPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-          {herbs.map((herb) => (
+          {herbs.map((herb: any) => (
             <Link key={herb.id} href={`/herbs/${herb.id}`} className="group block">
               <Card className="overflow-hidden border border-border hover:border-primary/40 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg">
                 <div className="relative h-48 bg-muted overflow-hidden">
@@ -78,7 +78,7 @@ export default function HerbsPage() {
                     <MapPin className="w-3 h-3" /> {herb.region}
                   </div>
                   <div className="flex flex-wrap gap-1 mt-2">
-                    {(herb.benefits ?? []).slice(0, 2).map((b) => (
+                    {(herb.benefits ?? []).slice(0, 2).map((b: string) => (
                       <Badge key={b} variant="secondary" className="text-xs">{b}</Badge>
                     ))}
                   </div>

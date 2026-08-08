@@ -134,7 +134,7 @@ export default function ProductsPage() {
                       </span>
                     )}
                   </div>
-                  <span className="text-[10px] text-muted-foreground">Stock: {product.stock_quantity} available</span>
+                  <span className="text-[10px] text-muted-foreground">Stock: {(product as any).stock_quantity ?? product.stock_qty ?? 100} available</span>
                 </div>
                 <Button size="sm" className="gap-1.5 text-xs">
                   <ShoppingBag className="w-3.5 h-3.5" /> Buy Now
