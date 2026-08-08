@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from "react";
-import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, Polygon, Polyline, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +16,9 @@ import {
   BarChart3,
   Layers,
   Sprout,
+  Truck,
+  Eye,
+  Navigation,
 } from "lucide-react";
 
 // Data Types
@@ -46,7 +49,124 @@ export interface OverproductionDataset {
   districts: DistrictData[];
 }
 
-// Custom Leaflet Markers using L.divIcon
+export interface TransportRoute {
+  id: string;
+  name: string;
+  fromName: string;
+  toName: string;
+  waypoints: [number, number][];
+  color: string;
+  cargo: string;
+  estHours: number;
+  truckEmoji: string;
+}
+
+// Transportation Routes connecting Surplus Districts to Logistics & Consumption Hubs
+const SURPLUS_TRANSPORT_ROUTES: TransportRoute[] = [
+  {
+    id: "route-ariyalur-chennai",
+    name: "Ariyalur Vegetable Surplus ➔ Chennai Central APMC",
+    fromName: "Ariyalur (44.6 T/Ha)",
+    toName: "Chennai Wholesale Hub",
+    waypoints: [
+      [11.1401, 79.0786], // Ariyalur
+      [11.7480, 79.7714], // Cuddalore Transit
+      [12.8342, 79.7036], // Kancheepuram Checkpoint
+      [13.0827, 80.2707], // Chennai APMC
+    ],
+    color: "#ef4444",
+    cargo: "Tapioca & Mixed Vegetables (72,500 T)",
+    estHours: 5.5,
+    truckEmoji: "🚚",
+  },
+  {
+    id: "route-theni-madurai",
+    name: "Theni Horticulture Express ➔ Madurai Cold Chain",
+    fromName: "Theni (37.1 T/Ha)",
+    toName: "Madurai Logistics Hub",
+    waypoints: [
+      [10.0104, 77.4768], // Theni
+      [9.9252, 78.1198],  // Madurai Hub
+    ],
+    color: "#f97316",
+    cargo: "Tomatoes & Green Chillies (274,000 T)",
+    estHours: 2.0,
+    truckEmoji: "🚛",
+  },
+  {
+    id: "route-nilgiris-coimbatore",
+    name: "Nilgiris Hill Harvest ➔ Coimbatore Wholesale Mandi",
+    fromName: "The Nilgiris (35.5 T/Ha)",
+    toName: "Coimbatore APMC",
+    waypoints: [
+      [11.4916, 76.7337], // Nilgiris
+      [11.3410, 77.7172], // Erode Bypass
+      [11.0168, 76.9558], // Coimbatore Mandi
+    ],
+    color: "#eab308",
+    cargo: "Carrots, Cabbage & Potatoes (158,000 T)",
+    estHours: 3.2,
+    truckEmoji: "🚚",
+  },
+  {
+    id: "route-karur-trichy",
+    name: "Karur Produce Corridor ➔ Trichy Processing Hub",
+    fromName: "Karur (37.2 T/Ha)",
+    toName: "Trichy Processing Complex",
+    waypoints: [
+      [10.9601, 78.0766], // Karur
+      [10.7905, 78.7047], // Trichy Hub
+    ],
+    color: "#ef4444",
+    cargo: "Gourd & Drumsticks (120,000 T)",
+    estHours: 1.8,
+    truckEmoji: "🚛",
+  },
+  {
+    id: "route-krishnagiri-hosur",
+    name: "Krishnagiri Border SLA ➔ Hosur Inter-State Terminal",
+    fromName: "Krishnagiri (27.2 T/Ha)",
+    toName: "Hosur Logistics Terminal",
+    waypoints: [
+      [12.5186, 78.2137], // Krishnagiri
+      [12.7409, 77.8253], // Hosur Border Hub
+    ],
+    color: "#10b981",
+    cargo: "Mangoes & Polyhouse Crops (265,000 T)",
+    estHours: 1.2,
+    truckEmoji: "🚚",
+  },
+];
+
+// Helper to generate a realistic closed polygon around a district centroid
+function generateDistrictPolygon(district: DistrictData): [number, number][] {
+  const points: [number, number][] = [];
+  const sides = 10;
+  // Scale radius based on area (between 0.08° to 0.22° (~9km to 24km radius))
+  const baseRadius = 0.07 + Math.sqrt(district.areaHa) * 0.0008;
+
+  // Simple deterministic hash based on district name string to create organic shapes
+  let hash = 0;
+  for (let i = 0; i < district.district.length; i++) {
+    hash = (hash << 5) - hash + district.district.charCodeAt(i);
+    hash |= 0;
+  }
+
+  for (let i = 0; i < sides; i++) {
+    const angle = (i * 2 * Math.PI) / sides;
+    // Introduce gentle variation per angle (variation between 0.85 and 1.15)
+    const angleHash = Math.abs(Math.sin(hash + i * 1.7));
+    const r = baseRadius * (0.85 + angleHash * 0.3);
+
+    const lat = district.lat + r * Math.cos(angle) * 0.85; // Slight lat squeeze for earth curvature
+    const lng = district.lng + r * Math.sin(angle);
+    points.push([lat, lng]);
+  }
+
+  return points;
+}
+
+// Custom Leaflet Pin Markers using L.divIcon
 const overproducingIcon = L.divIcon({
   className: "custom-leaflet-pin-overproducing",
   html: `
@@ -63,7 +183,6 @@ const overproducingIcon = L.divIcon({
       color: #ffffff;
       font-size: 15px;
       font-weight: bold;
-      animation: pulse-red 2s infinite ease-in-out;
     ">
       🚨
     </div>
@@ -102,10 +221,90 @@ function MapCenterController({ coords }: { coords: [number, number] | null }) {
   const map = useMap();
   useEffect(() => {
     if (coords) {
-      map.flyTo(coords, 9, { duration: 1.2 });
+      map.flyTo(coords, 8.5, { duration: 1.2 });
     }
   }, [coords, map]);
   return null;
+}
+
+// Animated Moving Truck Marker Component
+function MovingTruckMarker({ route }: { route: TransportRoute }) {
+  const [currentPos, setCurrentPos] = useState<[number, number]>(route.waypoints[0]);
+  const [progress, setProgress] = useState<number>(0);
+
+  useEffect(() => {
+    let animId: number;
+    let startTime: number | null = null;
+    const duration = 16000 + (route.estHours * 1200); // 16-22 sec animation cycle
+
+    const animate = (timestamp: number) => {
+      if (!startTime) startTime = timestamp;
+      const elapsed = (timestamp - startTime) % duration;
+      const p = elapsed / duration;
+      setProgress(p);
+
+      // Multi-segment interpolation along route waypoints
+      const numSegments = route.waypoints.length - 1;
+      const segmentProgress = p * numSegments;
+      const segmentIndex = Math.min(Math.floor(segmentProgress), numSegments - 1);
+      const localP = segmentProgress - segmentIndex;
+
+      const p1 = route.waypoints[segmentIndex];
+      const p2 = route.waypoints[segmentIndex + 1];
+
+      const lat = p1[0] + (p2[0] - p1[0]) * localP;
+      const lng = p1[1] + (p2[1] - p1[1]) * localP;
+
+      setCurrentPos([lat, lng]);
+      animId = requestAnimationFrame(animate);
+    };
+
+    animId = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(animId);
+  }, [route]);
+
+  const truckIcon = L.divIcon({
+    className: "custom-truck-animated-pin",
+    html: `
+      <div style="
+        background: ${route.color};
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        border: 2px solid #ffffff;
+        box-shadow: 0 0 14px ${route.color}, 0 2px 6px rgba(0,0,0,0.4);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+        transform: scale(1.1);
+      ">
+        ${route.truckEmoji}
+      </div>
+    `,
+    iconSize: [32, 32],
+    iconAnchor: [16, 16],
+  });
+
+  return (
+    <Marker position={currentPos} icon={truckIcon}>
+      <Popup>
+        <div className="p-1 space-y-1.5 text-xs text-foreground min-w-[210px]">
+          <h4 className="font-bold text-sm text-amber-500 flex items-center gap-1">
+            <Truck className="w-4 h-4 text-primary" /> Active Logistics Transit
+          </h4>
+          <p className="font-semibold text-foreground">{route.name}</p>
+          <div className="bg-muted/60 p-2 rounded-xl text-[11px] space-y-1">
+            <p>From: <strong>{route.fromName}</strong></p>
+            <p>Destination: <strong>{route.toName}</strong></p>
+            <p>Cargo: <strong className="text-emerald-400">{route.cargo}</strong></p>
+            <p>Transit ETA: <strong>~{route.estHours} Hours</strong></p>
+            <p>Route Progress: <strong>{(progress * 100).toFixed(0)}% Completed</strong></p>
+          </div>
+        </div>
+      </Popup>
+    </Marker>
+  );
 }
 
 export function CropMap() {
@@ -116,12 +315,13 @@ export function CropMap() {
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [selectedDistrict, setSelectedDistrict] = useState<DistrictData | null>(null);
   const [flyCoords, setFlyCoords] = useState<[number, number] | null>(null);
+  const [showPolygons, setShowPolygons] = useState<boolean>(true);
+  const [showRoutes, setShowRoutes] = useState<boolean>(true);
 
   const fetchData = async () => {
     setLoading(true);
     setError(null);
     try {
-      // Try fetching from root or public path
       const baseUrl = import.meta.env.BASE_URL ? import.meta.env.BASE_URL.replace(/\/$/, "") : "";
       const jsonUrl = `${baseUrl}/geotagged_overproduction.json`;
       const res = await fetch(jsonUrl);
@@ -268,19 +468,19 @@ export function CropMap() {
       </div>
 
       {/* Main Map & Filter Controls Container */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 min-h-[580px]">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 min-h-[600px]">
         {/* Map Viewport (Lg 8 cols) */}
         <div className="lg:col-span-8 flex flex-col space-y-3">
           {/* Map Controls Header */}
-          <div className="flex flex-wrap items-center justify-between gap-2 bg-card p-3 rounded-2xl border border-border/60">
-            <div className="flex items-center gap-1.5">
+          <div className="flex flex-wrap items-center justify-between gap-2 bg-card p-3 rounded-2xl border border-border/60 shadow-sm">
+            <div className="flex flex-wrap items-center gap-1.5">
               <Button
                 size="sm"
                 variant={filter === "all" ? "default" : "outline"}
                 onClick={() => setFilter("all")}
                 className="text-xs h-8"
               >
-                All Districts ({data.districts.length})
+                All ({data.districts.length})
               </Button>
               <Button
                 size="sm"
@@ -300,9 +500,34 @@ export function CropMap() {
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
                 Standard ({data.districts.length - overproducingDistricts.length})
               </Button>
+
+              <div className="h-4 w-[1px] bg-border mx-1 hidden sm:block" />
+
+              {/* Layer Toggles */}
+              <Button
+                size="sm"
+                variant={showPolygons ? "default" : "outline"}
+                onClick={() => setShowPolygons(!showPolygons)}
+                className="text-xs h-8 gap-1"
+                title="Toggle District Polygon Boundaries"
+              >
+                <Eye className="w-3.5 h-3.5" />
+                Polygons
+              </Button>
+
+              <Button
+                size="sm"
+                variant={showRoutes ? "default" : "outline"}
+                onClick={() => setShowRoutes(!showRoutes)}
+                className="text-xs h-8 gap-1 text-amber-400"
+                title="Toggle Animated Moving Truck Routes"
+              >
+                <Truck className="w-3.5 h-3.5" />
+                Trucks 🚚
+              </Button>
             </div>
 
-            <div className="relative w-full sm:w-56">
+            <div className="relative w-full sm:w-48">
               <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
               <Input
                 type="text"
@@ -315,11 +540,11 @@ export function CropMap() {
           </div>
 
           {/* Map Box */}
-          <div className="relative flex-1 rounded-2xl overflow-hidden border border-border/60 shadow-xl min-h-[460px]">
+          <div className="relative flex-1 rounded-2xl overflow-hidden border border-border/60 shadow-xl min-h-[500px]">
             <MapContainer
               center={[10.8, 78.7]}
               zoom={7.5}
-              style={{ height: "100%", width: "100%", minHeight: "460px" }}
+              style={{ height: "100%", width: "100%", minHeight: "500px" }}
               className="z-0"
             >
               <TileLayer
@@ -329,6 +554,64 @@ export function CropMap() {
 
               <MapCenterController coords={flyCoords} />
 
+              {/* Render Closed Polygon Shapes over Districts */}
+              {showPolygons &&
+                filteredDistricts.map((district) => {
+                  const polyPoints = generateDistrictPolygon(district);
+                  const isOver = district.isOverproducing;
+
+                  return (
+                    <Polygon
+                      key={`poly-${district.district}`}
+                      positions={polyPoints}
+                      pathOptions={{
+                        color: isOver ? "#dc2626" : "#059669",
+                        fillColor: isOver ? "#ef4444" : "#10b981",
+                        fillOpacity: isOver ? 0.35 : 0.18,
+                        weight: isOver ? 2.5 : 1.5,
+                        dashArray: isOver ? "6, 6" : undefined,
+                      }}
+                      eventHandlers={{
+                        click: () => {
+                          setSelectedDistrict(district);
+                          setFlyCoords([district.lat, district.lng]);
+                        },
+                      }}
+                    >
+                      <Popup>
+                        <div className="p-1 space-y-1.5 text-xs text-foreground">
+                          <h4 className="font-bold text-sm text-foreground flex items-center gap-1">
+                            <Navigation className="w-3.5 h-3.5 text-primary" /> {district.district} Boundary Zone
+                          </h4>
+                          <p>Category: <strong className={isOver ? "text-red-500" : "text-emerald-600"}>{isOver ? "Overproducing District Zone" : "Standard Yield District Zone"}</strong></p>
+                          <p>Area Extent: {district.areaHa.toLocaleString()} Ha</p>
+                          <p>Productivity: <strong>{district.productivity} Tonnes/Ha</strong></p>
+                        </div>
+                      </Popup>
+                    </Polygon>
+                  );
+                })}
+
+              {/* Render Animated Moving Truck Routes & Polylines */}
+              {showRoutes &&
+                SURPLUS_TRANSPORT_ROUTES.map((route) => (
+                  <React.Fragment key={route.id}>
+                    {/* Polyline corridor line */}
+                    <Polyline
+                      positions={route.waypoints}
+                      pathOptions={{
+                        color: route.color,
+                        weight: 4,
+                        dashArray: "8, 12",
+                        opacity: 0.85,
+                      }}
+                    />
+                    {/* Animated Moving Truck */}
+                    <MovingTruckMarker route={route} />
+                  </React.Fragment>
+                ))}
+
+              {/* Render Pins */}
               {filteredDistricts.map((district) => (
                 <Marker
                   key={district.district}
@@ -398,39 +681,69 @@ export function CropMap() {
             </MapContainer>
 
             {/* Map Legend Overlay */}
-            <div className="absolute bottom-4 left-4 z-[400] bg-card/95 backdrop-blur-md border border-border/60 p-3 rounded-xl shadow-lg text-xs space-y-1.5 max-w-[240px]">
+            <div className="absolute bottom-4 left-4 z-[400] bg-card/95 backdrop-blur-md border border-border/60 p-3 rounded-xl shadow-lg text-xs space-y-1.5 max-w-[260px]">
               <h5 className="font-bold text-[11px] uppercase tracking-wider text-muted-foreground">
-                Map Legend
+                GIS Polygon & Logistics Legend
               </h5>
               <div className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded-full bg-red-500 border border-white inline-block shadow-sm" />
+                <span className="w-3 h-3 rounded-sm bg-red-500/40 border border-red-500 inline-block shadow-sm" />
                 <span className="text-foreground text-[11px] font-medium">
-                  Overproducing District (&ge; {data.metadata.thresholdProductivityTonnesPerHa} T/Ha)
+                  Overproducing District Polygon Boundary
                 </span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded-full bg-emerald-500 border border-white inline-block shadow-sm" />
+                <span className="w-3 h-3 rounded-sm bg-emerald-500/30 border border-emerald-500 inline-block shadow-sm" />
                 <span className="text-foreground text-[11px]">
-                  Standard Productivity District (&lt; {data.metadata.thresholdProductivityTonnesPerHa} T/Ha)
+                  Standard District Polygon Boundary
+                </span>
+              </div>
+              <div className="flex items-center gap-2 pt-1 border-t border-border/50">
+                <span className="text-base">🚚</span>
+                <span className="text-amber-400 text-[11px] font-bold">
+                  Moving Truck Logistics SLA Route
                 </span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Sidebar District List & Inspector (Lg 4 cols) */}
+        {/* Sidebar District List & Active Truck Queue Inspector (Lg 4 cols) */}
         <div className="lg:col-span-4 flex flex-col bg-card border border-border/60 rounded-2xl p-4 space-y-3 overflow-hidden">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-bold text-foreground flex items-center gap-1.5">
-              <MapPin className="w-4 h-4 text-primary" /> District Breakdown
+              <MapPin className="w-4 h-4 text-primary" /> District & Route Inspector
             </h3>
             <Badge variant="outline" className="text-[11px]">
-              {filteredDistricts.length} results
+              {filteredDistricts.length} Districts
             </Badge>
           </div>
 
+          {/* Active Moving Truck Routes Card Box */}
+          <div className="space-y-2 bg-muted/40 p-2.5 rounded-xl border border-border/60">
+            <h4 className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
+              <Truck className="w-3.5 h-3.5" /> Moving Surplus Transport Lines ({SURPLUS_TRANSPORT_ROUTES.length})
+            </h4>
+            <div className="space-y-1.5 max-h-[140px] overflow-y-auto pr-1 text-[11px] custom-scrollbar">
+              {SURPLUS_TRANSPORT_ROUTES.map((r) => (
+                <div
+                  key={r.id}
+                  onClick={() => setFlyCoords(r.waypoints[0])}
+                  className="p-2 rounded-lg bg-background border border-border/60 hover:border-amber-500/50 cursor-pointer transition-all space-y-0.5"
+                >
+                  <div className="flex items-center justify-between font-bold">
+                    <span className="text-foreground flex items-center gap-1">
+                      <span>{r.truckEmoji}</span> {r.fromName}
+                    </span>
+                    <span className="text-amber-400 text-[10px]">~{r.estHours}h SLA</span>
+                  </div>
+                  <p className="text-muted-foreground text-[10px]">Destination: {r.toName}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
           {/* District Scroll List */}
-          <div className="flex-1 overflow-y-auto space-y-2 pr-1 max-h-[480px] custom-scrollbar">
+          <div className="flex-1 overflow-y-auto space-y-2 pr-1 max-h-[320px] custom-scrollbar">
             {filteredDistricts.length === 0 ? (
               <div className="text-center py-8 text-xs text-muted-foreground">
                 No districts match your search query or filter.
@@ -471,7 +784,7 @@ export function CropMap() {
 
                   {d.isOverproducing && (
                     <div className="text-[10px] text-red-400 font-medium flex items-center justify-between pt-0.5">
-                      <span>Overproduction Flag</span>
+                      <span>Polygon Zone Active</span>
                       <span className="font-bold">+{d.pctAboveAverage}% vs Avg</span>
                     </div>
                   )}
